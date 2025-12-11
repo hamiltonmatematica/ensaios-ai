@@ -53,7 +53,7 @@ export async function POST(req: Request) {
         if (resend) {
             try {
                 await resend.emails.send({
-                    from: 'Ensaios.ai <nao-responda@ensaios.ai>', // Ajustar remetente após configurar domínio
+                    from: 'Ensaios.AI <onboarding@resend.dev>',
                     to: email,
                     subject: 'Bem-vindo ao Ensaios.ai!',
                     html: `
