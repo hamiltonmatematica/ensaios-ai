@@ -2,6 +2,7 @@ import type { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import GoogleProvider from "next-auth/providers/google"
 import { prisma } from "@/lib/prisma"
+import bcrypt from "bcryptjs"
 
 // Configuração de opções do NextAuth
 export const authOptions: NextAuthOptions = {
@@ -20,31 +21,19 @@ export const authOptions: NextAuthOptions = {
                 const password = credentials.password
 
                 // Busca usuário
-                let user = await prisma.user.findUnique({
+                const user = await prisma.user.findUnique({
                     where: { email }
                 })
 
-                // Se não existe, cria novo (Cadastro Simplificado)
-                if (!user) {
-                    user = await prisma.user.create({
-                        data: {
-                            email,
-                            password, // Em produção, use hash!
-                            name: email.split("@")[0],
-                            credits: 3,
-                        }
-                    })
-                } else {
-                    // Verifica senha
-                    if (user.password && user.password !== password) {
-                        return null
-                    }
-                    if (!user.password) {
-                        await prisma.user.update({
-                            where: { id: user.id },
-                            data: { password }
-                        })
-                    }
+                if (!user || !user.password) {
+                    return null
+                }
+
+                // Verifica senha com bcrypt
+                const isValid = await bcrypt.compare(password, user.password)
+
+                if (!isValid) {
+                    return null
                 }
 
                 return {
