@@ -27,13 +27,21 @@ export default function Header({ onOpenPricing, onOpenLogin }: HeaderProps) {
                     {status === "loading" ? (
                         <div className="h-8 w-24 bg-zinc-800 animate-pulse rounded-full" />
                     ) : !session ? (
-                        <button
-                            onClick={onOpenLogin}
-                            className="text-sm font-medium text-zinc-300 hover:text-white transition-colors flex items-center gap-2"
-                        >
-                            <User className="w-4 h-4" />
-                            Entrar
-                        </button>
+                        <>
+                            <a
+                                href="/support"
+                                className="text-sm font-medium text-zinc-300 hover:text-white transition-colors"
+                            >
+                                Suporte
+                            </a>
+                            <button
+                                onClick={onOpenLogin}
+                                className="text-sm font-medium text-zinc-300 hover:text-white transition-colors flex items-center gap-2"
+                            >
+                                <User className="w-4 h-4" />
+                                Entrar
+                            </button>
+                        </>
                     ) : (
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2">
