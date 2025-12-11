@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String?
+  image         String?
+  password      String?       // Para login com email/senha
+  emailVerified DateTime?
+  credits       Int           @default(3) // 3 gerações gratuitas
+  role          Role          @default(USER)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  accounts      Account[]
+  sessions      Session[]
+  generations   Generation[]
+  transactions  Transaction[]
+  supportMessages SupportMessage[]
+}
+
+model SupportMessage {
+  id        String   @id @default(cuid())
+  userId    String?
+  name      String
+  email     String
+  whatsapp  String
+  message   String
+  status    String   @default("PENDING") // PENDING, READ, REPLIED
+  createdAt DateTime @default(now())
+  
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PhotoModel {
+  id              String       @id @default(cuid())
+  name            String
+  description     String
+  category        String       @default("geral")
+  thumbnailUrl    String
+  promptTemplate  String       // Prompt controlado pelo admin
+  isPremium       Boolean      @default(false)
+  creditsRequired Int          @default(1)
+  isActive        Boolean      @default(true)
+  displayOrder    Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  
+  tags            Tag[]        @relation("PhotoModelTags")
+  generations     Generation[]
+}
+
+model Tag {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  slug        String       @unique
+  color       String       @default("#6366f1") // Cor para badge
+  createdAt   DateTime     @default(now())
+  
+  photoModels PhotoModel[] @relation("PhotoModelTags")
+}
+
+model Generation {
+  id          String      @id @default(cuid())
+  userId      String
+  modelId     String
+  aspectRatio String
+  resultUrl   String?
+  status      Status      @default(PENDING)
+  createdAt   DateTime    @default(now())
+  
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  model       PhotoModel  @relation(fields: [modelId], references: [id])
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  userId        String
+  stripeId      String   @unique
+  packageId     String
+  amount        Float
+  credits       Int
+  status        String
+  createdAt     DateTime @default(now())
+  
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Status {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}

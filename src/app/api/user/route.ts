@@ -1,0 +1,47 @@
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
+import { NextResponse } from "next/server"
+
+// Evita pre-rendering durante build
+export const dynamic = 'force-dynamic'
+
+export async function GET() {
+    try {
+        const session = await getServerSession(authOptions)
+
+        if (!session?.user?.id) {
+            return NextResponse.json(
+                { error: "Não autenticado." },
+                { status: 401 }
+            )
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: {
+                id: true,
+                credits: true,
+                name: true,
+                email: true,
+                image: true,
+                role: true,
+            },
+        })
+
+        if (!user) {
+            return NextResponse.json(
+                { error: "Usuário não encontrado." },
+                { status: 404 }
+            )
+        }
+
+        return NextResponse.json({ user })
+    } catch (error) {
+        console.error("Erro ao buscar usuário:", error)
+        return NextResponse.json(
+            { error: "Erro ao buscar informações do usuário." },
+            { status: 500 }
+        )
+    }
+}
