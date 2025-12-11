@@ -119,7 +119,10 @@ export default function HomePage() {
 
     return (
         <div className="min-h-screen bg-zinc-950 flex flex-col font-sans text-zinc-100">
-            <Header onOpenPricing={() => setIsPricingOpen(true)} />
+            <Header
+                onOpenPricing={() => setIsPricingOpen(true)}
+                onOpenLogin={() => setShowLoginModal(true)}
+            />
 
             <main className="flex-1 container mx-auto px-4 py-8 max-w-5xl">
 

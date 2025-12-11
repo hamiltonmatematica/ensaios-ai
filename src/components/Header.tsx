@@ -5,9 +5,10 @@ import { Coins, LogOut, User } from "lucide-react"
 
 interface HeaderProps {
     onOpenPricing: () => void
+    onOpenLogin: () => void
 }
 
-export default function Header({ onOpenPricing }: HeaderProps) {
+export default function Header({ onOpenPricing, onOpenLogin }: HeaderProps) {
     const { data: session, status } = useSession()
 
     return (
@@ -27,7 +28,7 @@ export default function Header({ onOpenPricing }: HeaderProps) {
                         <div className="h-8 w-24 bg-zinc-800 animate-pulse rounded-full" />
                     ) : !session ? (
                         <button
-                            onClick={() => signIn("google")}
+                            onClick={onOpenLogin}
                             className="text-sm font-medium text-zinc-300 hover:text-white transition-colors flex items-center gap-2"
                         >
                             <User className="w-4 h-4" />

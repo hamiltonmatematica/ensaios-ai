@@ -65,7 +65,10 @@ export default function MyPhotosPage() {
 
     return (
         <div className="min-h-screen bg-zinc-950 flex flex-col font-sans text-zinc-100">
-            <Header onOpenPricing={() => setIsPricingOpen(true)} />
+            <Header
+                onOpenPricing={() => setIsPricingOpen(true)}
+                onOpenLogin={() => setShowLoginModal(true)}
+            />
 
             <main className="flex-1 container mx-auto px-4 py-8 max-w-5xl">
                 <div className="flex items-center gap-4 mb-8">
@@ -131,8 +134,8 @@ export default function MyPhotosPage() {
                                     <div className="flex items-center justify-between mb-2">
                                         <h3 className="font-semibold text-zinc-200">{gen.model.name}</h3>
                                         <span className={`text-[10px] px-2 py-0.5 rounded-full ${gen.status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
-                                                gen.status === 'FAILED' ? 'bg-red-500/20 text-red-400' :
-                                                    'bg-yellow-500/20 text-yellow-400'
+                                            gen.status === 'FAILED' ? 'bg-red-500/20 text-red-400' :
+                                                'bg-yellow-500/20 text-yellow-400'
                                             }`}>
                                             {gen.status === 'COMPLETED' ? 'Concluído' : gen.status === 'FAILED' ? 'Falhou' : 'Processando'}
                                         </span>
