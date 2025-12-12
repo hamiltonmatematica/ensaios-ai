@@ -7,6 +7,7 @@ const ASPECT_RATIOS: AspectRatioOption[] = [
     { id: '16:9', label: 'Widescreen', ratio: '16:9', iconClass: 'aspect-video' },
     { id: '9:16', label: 'Social story', ratio: '9:16', iconClass: 'aspect-[9/16]' },
     { id: '3:4', label: 'Traditional', ratio: '3:4', iconClass: 'aspect-[3/4]' },
+    { id: '4:5', label: 'Instagram', ratio: '4:5', iconClass: 'aspect-[4/5]' },
     { id: '4:3', label: 'Classic', ratio: '4:3', iconClass: 'aspect-[4/3]' },
 ]
 
@@ -23,7 +24,7 @@ export default function AspectRatioSelector({ selectedRatioId, onSelectRatio }: 
                 Escolha o tamanho ideal para sua necessidade (Instagram, LinkedIn, etc).
             </p>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 {ASPECT_RATIOS.map((option) => {
                     const isSelected = selectedRatioId === option.id
 
