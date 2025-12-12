@@ -52,21 +52,21 @@ export default function PricingModal({ isOpen, onClose }: PricingModalProps) {
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
 
             <div className="relative bg-zinc-900 border border-zinc-700 w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-                <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-zinc-900">
-                    <div>
-                        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                            <Sparkles className="w-6 h-6 text-yellow-500" />
+                <div className="p-4 sm:p-6 border-b border-zinc-800 flex justify-between items-start gap-4 bg-zinc-900">
+                    <div className="flex-1 min-w-0">
+                        <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500 shrink-0" />
                             Comprar Créditos
                         </h2>
-                        <p className="text-zinc-400 text-sm">Adquira pacotes para gerar mais ensaios e desbloquear estilos exclusivos.</p>
+                        <p className="text-zinc-400 text-xs sm:text-sm mt-1">Adquira pacotes para gerar mais ensaios.</p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
-                        <X className="w-6 h-6 text-zinc-400" />
+                    <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-full transition-colors shrink-0">
+                        <X className="w-5 h-5 sm:w-6 sm:h-6 text-zinc-400" />
                     </button>
                 </div>
 
                 <div className="p-6 overflow-y-auto bg-zinc-950/50">
-                    <div className="grid md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                         {CREDIT_PACKAGES.map((pkg) => (
                             <div
                                 key={pkg.id}

@@ -138,7 +138,7 @@ export default function HomePage() {
                     </p>
                 </div>
 
-                <div className="grid lg:grid-cols-[1fr_350px] gap-12">
+                <div className="flex flex-col lg:grid lg:grid-cols-[1fr_350px] gap-8 lg:gap-12">
                     {/* Left Column: Controls */}
                     <div className="flex flex-col">
                         <UploadSection
