@@ -61,32 +61,14 @@ export default function NewModelPage() {
         setIsLoading(true)
 
         try {
+            // Conversão da imagem para Base64 (solução temporária sem S3)
             let finalThumbnailUrl = ""
-
-            // Upload da imagem para Supabase Storage
             if (thumbnailFile) {
-                const base64Data = await new Promise<string>((resolve) => {
+                finalThumbnailUrl = await new Promise((resolve) => {
                     const reader = new FileReader()
                     reader.onloadend = () => resolve(reader.result as string)
                     reader.readAsDataURL(thumbnailFile)
                 })
-
-                // Envia para API de upload
-                const uploadRes = await fetch("/api/admin/upload", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        base64Data,
-                        fileName: name.toLowerCase().replace(/\s+/g, '-') || 'thumbnail'
-                    })
-                })
-
-                if (uploadRes.ok) {
-                    const uploadData = await uploadRes.json()
-                    finalThumbnailUrl = uploadData.url
-                } else {
-                    throw new Error("Erro no upload da imagem")
-                }
             }
 
             const res = await fetch("/api/admin/models", {
