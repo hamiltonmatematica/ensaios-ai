@@ -12,7 +12,13 @@ function createPrismaClient() {
     return new PrismaClient()
   }
 
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    // Configurações para melhor estabilidade com Supabase Transaction Pooler
+    max: 5, // Máximo de conexões no pool
+    idleTimeoutMillis: 30000, // 30 segundos de timeout ocioso
+    connectionTimeoutMillis: 10000, // 10 segundos para conectar
+  })
   const adapter = new PrismaPg(pool)
   return new PrismaClient({ adapter })
 }
@@ -20,3 +26,4 @@ function createPrismaClient() {
 export const prisma = globalForPrisma.prisma ?? createPrismaClient()
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+

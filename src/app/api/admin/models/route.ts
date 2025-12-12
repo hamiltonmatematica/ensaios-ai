@@ -82,9 +82,13 @@ export async function POST(request: NextRequest) {
         })
 
         return NextResponse.json({ model }, { status: 201 })
-    } catch (error) {
+    } catch (error: unknown) {
         console.error("Erro ao criar modelo:", error)
-        return NextResponse.json({ error: "Erro ao criar modelo" }, { status: 500 })
+        const errorMessage = error instanceof Error ? error.message : "Erro desconhecido"
+        return NextResponse.json({
+            error: "Erro ao salvar modelo",
+            details: errorMessage
+        }, { status: 500 })
     }
 }
 
@@ -132,9 +136,13 @@ export async function PUT(request: NextRequest) {
         })
 
         return NextResponse.json({ model })
-    } catch (error) {
+    } catch (error: unknown) {
         console.error("Erro ao atualizar modelo:", error)
-        return NextResponse.json({ error: "Erro ao atualizar modelo" }, { status: 500 })
+        const errorMessage = error instanceof Error ? error.message : "Erro desconhecido"
+        return NextResponse.json({
+            error: "Erro ao atualizar modelo",
+            details: errorMessage
+        }, { status: 500 })
     }
 }
 
