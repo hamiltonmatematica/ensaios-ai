@@ -24,6 +24,7 @@ export default function NewModelPage() {
     const [category, setCategory] = useState("geral")
     const [creditsRequired, setCreditsRequired] = useState(1)
     const [isPremium, setIsPremium] = useState(false)
+    const [isActive, setIsActive] = useState(true)
     const [selectedTags, setSelectedTags] = useState<string[]>([])
     const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
     const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
@@ -78,10 +79,12 @@ export default function NewModelPage() {
                     description,
                     promptTemplate,
                     category,
-                    creditsRequired: Number(creditsRequired),
+                    isFree: creditsRequired === 0,
+                    creditsRequired: creditsRequired === 0 ? 0 : Number(creditsRequired),
                     isPremium,
-                    tagIds: selectedTags, // Array de IDs
-                    thumbnailUrl: finalThumbnailUrl // Enviando base64 direto
+                    isActive,
+                    tagIds: selectedTags,
+                    thumbnailUrl: finalThumbnailUrl
                 })
             })
 
@@ -217,32 +220,64 @@ export default function NewModelPage() {
                         </div>
                     </div>
 
-                    {/* Configurações de Cobrança */}
+                    {/* Configurações do Modelo */}
                     <div className="p-4 bg-zinc-950 rounded-xl border border-zinc-800 space-y-4">
-                        <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium text-zinc-300">Modelo Premium?</label>
-                            <div
-                                onClick={() => setIsPremium(!isPremium)}
-                                className={`w-12 h-6 rounded-full cursor-pointer transition-colors relative ${isPremium ? 'bg-purple-600' : 'bg-zinc-700'}`}
-                            >
-                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${isPremium ? 'left-7' : 'left-1'}`} />
-                            </div>
-                        </div>
+                        {/* Modelo Gratuito */}
+                        <label className="flex items-center gap-3 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={!isPremium && creditsRequired === 0}
+                                onChange={(e) => {
+                                    if (e.target.checked) {
+                                        setIsPremium(false)
+                                        setCreditsRequired(0)
+                                    } else {
+                                        setCreditsRequired(1)
+                                    }
+                                }}
+                                className="w-5 h-5 rounded border-zinc-600 bg-zinc-800 text-blue-500 focus:ring-blue-500"
+                            />
+                            <span className="text-zinc-300">Modelo Gratuito (sem créditos)</span>
+                        </label>
 
-                        {isPremium && (
-                            <div className="pt-2 border-t border-zinc-800">
-                                <label className="text-sm font-medium text-zinc-400 mb-2 block">Créditos Necessários</label>
-                                <div className="flex items-center gap-4">
-                                    <input
-                                        type="range"
-                                        min="1" max="10"
-                                        value={creditsRequired}
-                                        onChange={e => setCreditsRequired(Number(e.target.value))}
-                                        className="flex-1 accent-purple-500"
-                                    />
-                                    <span className="text-xl font-bold w-8 text-center">{creditsRequired}</span>
+                        {/* Modelo Ativo */}
+                        <label className="flex items-center gap-3 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={isActive}
+                                onChange={(e) => setIsActive(e.target.checked)}
+                                className="w-5 h-5 rounded border-zinc-600 bg-zinc-800 text-blue-500 focus:ring-blue-500"
+                            />
+                            <span className="text-zinc-300">Modelo Ativo (visível para usuários)</span>
+                        </label>
+
+                        {/* Premium e Créditos - só mostra se não for gratuito */}
+                        {creditsRequired > 0 && (
+                            <>
+                                <div className="flex items-center justify-between pt-4 border-t border-zinc-800">
+                                    <label className="text-sm font-medium text-zinc-300">Modelo Premium?</label>
+                                    <div
+                                        onClick={() => setIsPremium(!isPremium)}
+                                        className={`w-12 h-6 rounded-full cursor-pointer transition-colors relative ${isPremium ? 'bg-purple-600' : 'bg-zinc-700'}`}
+                                    >
+                                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${isPremium ? 'left-7' : 'left-1'}`} />
+                                    </div>
                                 </div>
-                            </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-zinc-400 mb-2 block">Créditos Necessários</label>
+                                    <div className="flex items-center gap-4">
+                                        <input
+                                            type="range"
+                                            min="1" max="10"
+                                            value={creditsRequired}
+                                            onChange={e => setCreditsRequired(Number(e.target.value))}
+                                            className="flex-1 accent-purple-500"
+                                        />
+                                        <span className="text-xl font-bold w-8 text-center">{creditsRequired}</span>
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </div>
 
