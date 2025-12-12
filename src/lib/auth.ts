@@ -1,6 +1,5 @@
 import type { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
-import GoogleProvider from "next-auth/providers/google"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
@@ -51,25 +50,8 @@ export const authOptions: NextAuthOptions = {
         strategy: "jwt",
     },
     callbacks: {
-        async signIn({ user, account }) {
+        async signIn({ user }) {
             if (!user.email) return false
-
-            // Sincroniza dados básicos se for login social
-            if (account?.provider === "google") {
-                await prisma.user.upsert({
-                    where: { email: user.email },
-                    update: {
-                        name: user.name,
-                        image: user.image,
-                    },
-                    create: {
-                        email: user.email,
-                        name: user.name,
-                        image: user.image,
-                        credits: 3,
-                    }
-                })
-            }
             return true
         },
         async jwt({ token, user }) {
@@ -105,18 +87,6 @@ export const authOptions: NextAuthOptions = {
         },
     },
     pages: {
-        signIn: "/auth/signin", // Vamos manter customizado? O usuário pediu modal, mas o auth precisa saber onde ir se falhar.
-        // Como estamos usando modal, isso é menos crítico, mas bom ter.
+        signIn: "/auth/signin",
     },
 }
-
-// Adiciona Google dinamicamente se configurado
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    authOptions.providers.push(
-        GoogleProvider({
-            clientId: process.env.GOOGLE_CLIENT_ID,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        })
-    )
-}
-
