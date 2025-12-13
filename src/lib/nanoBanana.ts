@@ -1,9 +1,10 @@
-
+import Replicate from "replicate"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
-const API_KEY = process.env.GEMINI_API_KEY || ''
+const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN || ''
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ''
 
-// Mapeamento de aspect ratios
+// Mapeamento de aspect ratios para FLUX
 const ASPECT_RATIO_MAP: Record<string, string> = {
     '1:1': '1:1',
     '16:9': '16:9',
@@ -11,6 +12,8 @@ const ASPECT_RATIO_MAP: Record<string, string> = {
     '3:4': '3:4',
     '4:3': '4:3',
     '4:5': '4:5',
+    '3:2': '3:2',
+    '2:3': '2:3',
 }
 
 interface GenerateImageParams {
@@ -24,26 +27,77 @@ export async function generatePhotoshootImage({
     promptTemplate,
     aspectRatio,
 }: GenerateImageParams): Promise<string> {
-    if (!API_KEY) {
-        throw new Error("GEMINI_API_KEY não configurada.")
+    if (!REPLICATE_API_TOKEN) {
+        throw new Error("REPLICATE_API_TOKEN não configurado.")
     }
 
-    const genAI = new GoogleGenerativeAI(API_KEY)
-
-    // Usar gemini-2.0-flash-exp para análise de imagens e geração de texto
-    const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash-exp",
+    const replicate = new Replicate({
+        auth: REPLICATE_API_TOKEN,
     })
 
-    const apiAspectRatio = ASPECT_RATIO_MAP[aspectRatio] || '3:4'
+    const fluxAspectRatio = ASPECT_RATIO_MAP[aspectRatio] || '3:4'
 
-    // Prepara as imagens de referência
+    // Primeiro: usa Gemini para analisar as fotos e gerar um prompt detalhado
+    let detailedPrompt = promptTemplate
+
+    if (GEMINI_API_KEY && referenceImages.length > 0) {
+        try {
+            detailedPrompt = await analyzePhotosWithGemini(referenceImages, promptTemplate)
+            console.log("Prompt gerado pelo Gemini:", detailedPrompt)
+        } catch (error) {
+            console.error("Erro na análise com Gemini, usando prompt original:", error)
+        }
+    }
+
+    try {
+        // Usar FLUX 1.1 Pro para gerar a imagem
+        const output = await replicate.run(
+            "black-forest-labs/flux-1.1-pro",
+            {
+                input: {
+                    prompt: detailedPrompt,
+                    aspect_ratio: fluxAspectRatio,
+                    output_format: "webp",
+                    output_quality: 90,
+                    safety_tolerance: 2,
+                    prompt_upsampling: true,
+                }
+            }
+        )
+
+        // O output é uma URL da imagem
+        if (typeof output === 'string') {
+            return output
+        }
+
+        // Se for array, pega o primeiro
+        if (Array.isArray(output) && output.length > 0) {
+            return output[0] as string
+        }
+
+        throw new Error("FLUX não retornou uma imagem válida.")
+
+    } catch (error: unknown) {
+        console.error("Erro no FLUX:", error)
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+        throw new Error(`Falha na geração: ${errorMessage}`)
+    }
+}
+
+// Analisa fotos de referência com Gemini para gerar prompt detalhado
+async function analyzePhotosWithGemini(
+    referenceImages: string[],
+    promptTemplate: string
+): Promise<string> {
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
+
+    // Prepara as imagens
     const imageParts = referenceImages.slice(0, 3).map((base64Data) => {
         const cleanBase64 = base64Data.includes(',')
             ? base64Data.split(',')[1]
             : base64Data
 
-        // Detecta o mimeType
         const mimeMatch = base64Data.match(/data:([^;]+);/)
         const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg'
 
@@ -55,66 +109,22 @@ export async function generatePhotoshootImage({
         }
     })
 
-    // Prompt para análise das fotos e geração de descrição
-    const analysisPrompt = `Analyze these reference photos of a person carefully. Then create a detailed image generation prompt in English that would recreate this person in the following style/scenario:
+    const analysisPrompt = `Analyze these reference photos carefully. Create a detailed image generation prompt in English that would recreate this person in the following style:
 
 ${promptTemplate}
 
-Important instructions:
-- Describe the person's key facial features, skin tone, hair color and style
-- Apply the style/scenario from the template above
-- Output ONLY the image generation prompt, nothing else
-- The prompt should be detailed enough for an AI image generator
-- Aspect ratio will be ${apiAspectRatio}`
+Your response must be ONLY the prompt, nothing else. Include:
+- Physical description (face shape, skin tone, hair color/style, eye color)
+- The style/scenario from the template
+- Professional photography details (lighting, composition)
+- Maximum 200 words`
 
-    try {
-        // Primeiro: analisa as fotos e gera um prompt detalhado
-        const analysisResult = await model.generateContent([
-            analysisPrompt,
-            ...imageParts
-        ])
+    const result = await model.generateContent([
+        analysisPrompt,
+        ...imageParts
+    ])
 
-        const generatedPrompt = analysisResult.response.text()
-        console.log("Generated prompt:", generatedPrompt)
-
-        // Agora usa Imagen 3 para gerar a imagem
-        // Nota: Imagen 3 requer configuração específica
-        const imagenModel = genAI.getGenerativeModel({
-            model: "imagen-3.0-generate-002"
-        })
-
-        const imageResult = await imagenModel.generateContent({
-            contents: [{ role: "user", parts: [{ text: generatedPrompt }] }],
-            generationConfig: {
-                // @ts-expect-error - Imagen specific config
-                responseModalities: ["image", "text"],
-                responseMimeType: "image/png",
-            },
-        })
-
-        const response = imageResult.response
-
-        // Verifica se há imagem na resposta
-        if (response.candidates && response.candidates.length > 0) {
-            const candidate = response.candidates[0]
-            if (candidate.content && candidate.content.parts) {
-                for (const part of candidate.content.parts) {
-                    const partData = part as { inlineData?: { data: string; mimeType?: string } }
-                    if (partData.inlineData && partData.inlineData.data) {
-                        const mimeType = partData.inlineData.mimeType || 'image/png'
-                        return `data:${mimeType};base64,${partData.inlineData.data}`
-                    }
-                }
-            }
-        }
-
-        throw new Error("Imagen não retornou uma imagem. Verifique se sua API key tem acesso ao Imagen 3.")
-
-    } catch (error: unknown) {
-        console.error("Erro na geração:", error)
-        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
-        throw new Error(`Falha na geração de imagem: ${errorMessage}`)
-    }
+    return result.response.text().trim()
 }
 
 // Helper para converter File para base64 (client-side)
