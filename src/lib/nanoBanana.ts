@@ -1,10 +1,8 @@
-import Replicate from "replicate"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
-const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN || ''
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ''
+const API_KEY = process.env.GEMINI_API_KEY || ''
 
-// Mapeamento de aspect ratios para FLUX
+// Mapeamento de aspect ratios
 const ASPECT_RATIO_MAP: Record<string, string> = {
     '1:1': '1:1',
     '16:9': '16:9',
@@ -12,8 +10,6 @@ const ASPECT_RATIO_MAP: Record<string, string> = {
     '3:4': '3:4',
     '4:3': '4:3',
     '4:5': '4:5',
-    '3:2': '3:2',
-    '2:3': '2:3',
 }
 
 interface GenerateImageParams {
@@ -27,72 +23,14 @@ export async function generatePhotoshootImage({
     promptTemplate,
     aspectRatio,
 }: GenerateImageParams): Promise<string> {
-    if (!REPLICATE_API_TOKEN) {
-        throw new Error("REPLICATE_API_TOKEN não configurado.")
+    if (!API_KEY) {
+        throw new Error("GEMINI_API_KEY não configurada.")
     }
 
-    const replicate = new Replicate({
-        auth: REPLICATE_API_TOKEN,
-    })
+    const genAI = new GoogleGenerativeAI(API_KEY)
+    const apiAspectRatio = ASPECT_RATIO_MAP[aspectRatio] || '3:4'
 
-    const fluxAspectRatio = ASPECT_RATIO_MAP[aspectRatio] || '3:4'
-
-    // Primeiro: usa Gemini para analisar as fotos e gerar um prompt detalhado
-    let detailedPrompt = promptTemplate
-
-    if (GEMINI_API_KEY && referenceImages.length > 0) {
-        try {
-            detailedPrompt = await analyzePhotosWithGemini(referenceImages, promptTemplate)
-            console.log("Prompt gerado pelo Gemini:", detailedPrompt)
-        } catch (error) {
-            console.error("Erro na análise com Gemini, usando prompt original:", error)
-        }
-    }
-
-    try {
-        // Usar FLUX 1.1 Pro para gerar a imagem
-        const output = await replicate.run(
-            "black-forest-labs/flux-1.1-pro",
-            {
-                input: {
-                    prompt: detailedPrompt,
-                    aspect_ratio: fluxAspectRatio,
-                    output_format: "webp",
-                    output_quality: 90,
-                    safety_tolerance: 2,
-                    prompt_upsampling: true,
-                }
-            }
-        )
-
-        // O output é uma URL da imagem
-        if (typeof output === 'string') {
-            return output
-        }
-
-        // Se for array, pega o primeiro
-        if (Array.isArray(output) && output.length > 0) {
-            return output[0] as string
-        }
-
-        throw new Error("FLUX não retornou uma imagem válida.")
-
-    } catch (error: unknown) {
-        console.error("Erro no FLUX:", error)
-        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
-        throw new Error(`Falha na geração: ${errorMessage}`)
-    }
-}
-
-// Analisa fotos de referência com Gemini para gerar prompt detalhado
-async function analyzePhotosWithGemini(
-    referenceImages: string[],
-    promptTemplate: string
-): Promise<string> {
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
-
-    // Prepara as imagens
+    // Prepara as imagens de referência
     const imageParts = referenceImages.slice(0, 3).map((base64Data) => {
         const cleanBase64 = base64Data.includes(',')
             ? base64Data.split(',')[1]
@@ -109,22 +47,63 @@ async function analyzePhotosWithGemini(
         }
     })
 
-    const analysisPrompt = `Analyze these reference photos carefully. Create a detailed image generation prompt in English that would recreate this person in the following style:
+    // Prompt para gerar a imagem
+    const prompt = `Based on these reference photos, generate a new professional photoshoot image with the following style:
 
 ${promptTemplate}
 
-Your response must be ONLY the prompt, nothing else. Include:
-- Physical description (face shape, skin tone, hair color/style, eye color)
-- The style/scenario from the template
-- Professional photography details (lighting, composition)
-- Maximum 200 words`
+Important:
+- Maintain the person's facial features, skin tone, and overall appearance from the reference photos
+- Apply the style described above
+- High quality, professional lighting
+- Aspect ratio: ${apiAspectRatio}
+- Photorealistic result
 
-    const result = await model.generateContent([
-        analysisPrompt,
-        ...imageParts
-    ])
+Generate the image now.`
 
-    return result.response.text().trim()
+    try {
+        // Usando Imagen 3 para geração de imagens
+        const model = genAI.getGenerativeModel({
+            model: "imagen-3.0-generate-002"
+        })
+
+        const result = await model.generateContent({
+            contents: [{
+                role: "user",
+                parts: [
+                    { text: prompt },
+                    ...imageParts
+                ]
+            }],
+        })
+
+        const response = result.response
+
+        // Verifica se há imagem na resposta
+        if (response.candidates && response.candidates.length > 0) {
+            const candidate = response.candidates[0]
+            if (candidate.content && candidate.content.parts) {
+                for (const part of candidate.content.parts) {
+                    const partData = part as { inlineData?: { data: string; mimeType?: string } }
+                    if (partData.inlineData && partData.inlineData.data) {
+                        const mimeType = partData.inlineData.mimeType || 'image/png'
+                        return `data:${mimeType};base64,${partData.inlineData.data}`
+                    }
+                }
+            }
+        }
+
+        // Se não gerou imagem, tenta ler o texto de erro
+        let textResponse = ""
+        try { textResponse = response.text() } catch { /* ignore */ }
+
+        throw new Error(`Não foi possível gerar a imagem. Resposta: ${textResponse.substring(0, 100)}`)
+
+    } catch (error: unknown) {
+        console.error("Erro na geração:", error)
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+        throw new Error(`Falha na geração: ${errorMessage}`)
+    }
 }
 
 // Helper para converter File para base64 (client-side)
