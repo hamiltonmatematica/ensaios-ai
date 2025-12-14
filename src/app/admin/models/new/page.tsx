@@ -119,7 +119,7 @@ export default function NewModelPage() {
         try {
             let finalThumbnailUrl = ""
 
-            // Upload da imagem para Supabase Storage
+            // Upload da imagem para Supabase Storage (com fallback para base64)
             if (thumbnailFile) {
                 const base64Data = await new Promise<string>((resolve) => {
                     const reader = new FileReader()
@@ -127,21 +127,29 @@ export default function NewModelPage() {
                     reader.readAsDataURL(thumbnailFile)
                 })
 
-                // Envia para API de upload
-                const uploadRes = await fetch("/api/admin/upload", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        base64Data,
-                        fileName: name.toLowerCase().replace(/\s+/g, '-') || 'thumbnail'
+                try {
+                    // Tenta upload para Supabase Storage
+                    const uploadRes = await fetch("/api/admin/upload", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            base64Data,
+                            fileName: name.toLowerCase().replace(/\s+/g, '-') || 'thumbnail'
+                        })
                     })
-                })
 
-                if (uploadRes.ok) {
-                    const uploadData = await uploadRes.json()
-                    finalThumbnailUrl = uploadData.url
-                } else {
-                    throw new Error("Erro no upload da imagem")
+                    if (uploadRes.ok) {
+                        const uploadData = await uploadRes.json()
+                        finalThumbnailUrl = uploadData.url
+                    } else {
+                        // Fallback: usa base64 diretamente
+                        console.warn("Upload Supabase falhou, usando base64")
+                        finalThumbnailUrl = base64Data
+                    }
+                } catch {
+                    // Fallback: usa base64 diretamente
+                    console.warn("Erro no upload, usando base64")
+                    finalThumbnailUrl = base64Data
                 }
             }
 
