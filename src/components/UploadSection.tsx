@@ -8,14 +8,76 @@ interface UploadSectionProps {
     onFilesChange: (files: File[]) => void
 }
 
+// Função para comprimir imagem
+async function compressImage(file: File, maxSizeKB: number = 500): Promise<File> {
+    return new Promise((resolve) => {
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        const img = new Image()
+
+        img.onload = () => {
+            // Calcula dimensões mantendo aspect ratio, máximo 1024px
+            const maxDim = 1024
+            let width = img.width
+            let height = img.height
+
+            if (width > maxDim || height > maxDim) {
+                if (width > height) {
+                    height = (height / width) * maxDim
+                    width = maxDim
+                } else {
+                    width = (width / height) * maxDim
+                    height = maxDim
+                }
+            }
+
+            canvas.width = width
+            canvas.height = height
+            ctx?.drawImage(img, 0, 0, width, height)
+
+            // Tenta diferentes qualidades até ficar abaixo do limite
+            let quality = 0.8
+            const tryCompress = () => {
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const sizeKB = blob.size / 1024
+                        if (sizeKB > maxSizeKB && quality > 0.3) {
+                            quality -= 0.1
+                            tryCompress()
+                        } else {
+                            const compressedFile = new File([blob], file.name, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now()
+                            })
+                            resolve(compressedFile)
+                        }
+                    } else {
+                        resolve(file) // fallback
+                    }
+                }, 'image/jpeg', quality)
+            }
+            tryCompress()
+        }
+
+        img.onerror = () => resolve(file) // fallback
+        img.src = URL.createObjectURL(file)
+    })
+}
+
 export default function UploadSection({ files, onFilesChange }: UploadSectionProps) {
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             const newFiles = Array.from(e.target.files)
+
+            // Comprime cada imagem
+            const compressedFiles = await Promise.all(
+                newFiles.map(file => compressImage(file))
+            )
+
             // Limita a 3 arquivos no total
-            const combinedFiles = [...files, ...newFiles].slice(0, 3)
+            const combinedFiles = [...files, ...compressedFiles].slice(0, 3)
             onFilesChange(combinedFiles)
         }
     }
@@ -76,3 +138,4 @@ export default function UploadSection({ files, onFilesChange }: UploadSectionPro
         </div>
     )
 }
+
