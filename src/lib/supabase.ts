@@ -1,12 +1,22 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+// Cliente admin (lazy initialization para evitar erro no build)
+let supabaseAdmin: SupabaseClient | null = null
 
-// Cliente admin (para backend - tem permissão total)
-export const supabaseAdmin = supabaseServiceKey && supabaseUrl
-    ? createClient(supabaseUrl, supabaseServiceKey)
-    : null
+function getSupabaseAdmin(): SupabaseClient | null {
+    if (supabaseAdmin) return supabaseAdmin
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+        console.error('Supabase não configurado: faltam variáveis de ambiente')
+        return null
+    }
+
+    supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+    return supabaseAdmin
+}
 
 // Nome do bucket para thumbnails
 export const THUMBNAILS_BUCKET = 'thumbnails'
@@ -16,7 +26,9 @@ export async function uploadImage(
     base64Data: string,
     fileName: string
 ): Promise<string | null> {
-    if (!supabaseAdmin) {
+    const client = getSupabaseAdmin()
+
+    if (!client) {
         console.error('Supabase admin client não configurado')
         return null
     }
@@ -39,7 +51,7 @@ export async function uploadImage(
         const uniqueFileName = `${Date.now()}-${fileName}.${extension}`
 
         // Upload para o Supabase Storage
-        const { data, error } = await supabaseAdmin.storage
+        const { data, error } = await client.storage
             .from(THUMBNAILS_BUCKET)
             .upload(uniqueFileName, buffer, {
                 contentType: mimeType,
@@ -52,7 +64,7 @@ export async function uploadImage(
         }
 
         // Retorna URL pública
-        const { data: publicUrl } = supabaseAdmin.storage
+        const { data: publicUrl } = client.storage
             .from(THUMBNAILS_BUCKET)
             .getPublicUrl(data.path)
 
@@ -62,3 +74,4 @@ export async function uploadImage(
         return null
     }
 }
+
