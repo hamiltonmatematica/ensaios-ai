@@ -83,14 +83,6 @@ export default function HomePage() {
                 }),
             })
 
-            // Verifica se a resposta é válida
-            const contentType = res.headers.get("content-type")
-            if (!contentType || !contentType.includes("application/json")) {
-                const text = await res.text()
-                console.error("Resposta não-JSON:", text)
-                throw new Error("Erro no servidor. Tente novamente em alguns segundos.")
-            }
-
             const data = await res.json()
 
             if (!res.ok) {

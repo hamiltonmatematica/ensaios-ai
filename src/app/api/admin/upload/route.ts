@@ -18,7 +18,7 @@ async function checkAdmin() {
     return user?.role === "ADMIN"
 }
 
-// POST - Upload de imagem para Supabase Storage
+// POST - Upload de imagem
 export async function POST(request: NextRequest) {
     try {
         if (!await checkAdmin()) {
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         const imageUrl = await uploadImage(base64Data, fileName || 'thumbnail')
 
         if (!imageUrl) {
-            return NextResponse.json({ error: "Erro no upload. Verifique as variáveis SUPABASE." }, { status: 500 })
+            return NextResponse.json({ error: "Erro no upload da imagem" }, { status: 500 })
         }
 
         return NextResponse.json({ url: imageUrl })

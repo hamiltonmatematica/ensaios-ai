@@ -85,8 +85,7 @@ export default function NewModelPage() {
                     const uploadData = await uploadRes.json()
                     finalThumbnailUrl = uploadData.url
                 } else {
-                    const errData = await uploadRes.json()
-                    throw new Error(errData.error || "Erro no upload da imagem")
+                    throw new Error("Erro no upload da imagem")
                 }
             }
 

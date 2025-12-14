@@ -1,40 +1,32 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 
-// Cliente admin (lazy initialization para evitar erro no build)
-let supabaseAdmin: SupabaseClient | null = null
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
-function getSupabaseAdmin(): SupabaseClient | null {
-    if (supabaseAdmin) return supabaseAdmin
+// Cliente público (para frontend)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-        console.error('Supabase não configurado: faltam variáveis de ambiente')
-        return null
-    }
-
-    supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-    return supabaseAdmin
-}
+// Cliente admin (para backend - tem permissão total)
+export const supabaseAdmin = supabaseServiceKey
+    ? createClient(supabaseUrl, supabaseServiceKey)
+    : null
 
 // Nome do bucket para thumbnails
 export const THUMBNAILS_BUCKET = 'thumbnails'
 
-// Upload de imagem base64 para Supabase Storage
+// Helper para fazer upload de imagem base64
 export async function uploadImage(
     base64Data: string,
     fileName: string
 ): Promise<string | null> {
-    const client = getSupabaseAdmin()
-
-    if (!client) {
+    if (!supabaseAdmin) {
         console.error('Supabase admin client não configurado')
         return null
     }
 
     try {
-        // Remove prefixo data:image/...;base64,
+        // Remove prefixo data:image/...;base64, se existir
         const base64Content = base64Data.includes(',')
             ? base64Data.split(',')[1]
             : base64Data
@@ -51,7 +43,7 @@ export async function uploadImage(
         const uniqueFileName = `${Date.now()}-${fileName}.${extension}`
 
         // Upload para o Supabase Storage
-        const { data, error } = await client.storage
+        const { data, error } = await supabaseAdmin.storage
             .from(THUMBNAILS_BUCKET)
             .upload(uniqueFileName, buffer, {
                 contentType: mimeType,
@@ -64,7 +56,7 @@ export async function uploadImage(
         }
 
         // Retorna URL pública
-        const { data: publicUrl } = client.storage
+        const { data: publicUrl } = supabaseAdmin.storage
             .from(THUMBNAILS_BUCKET)
             .getPublicUrl(data.path)
 
@@ -75,3 +67,23 @@ export async function uploadImage(
     }
 }
 
+// Helper para deletar imagem
+export async function deleteImage(imageUrl: string): Promise<boolean> {
+    if (!supabaseAdmin) return false
+
+    try {
+        // Extrai o path do arquivo da URL
+        const urlParts = imageUrl.split(`${THUMBNAILS_BUCKET}/`)
+        if (urlParts.length < 2) return false
+
+        const filePath = urlParts[1]
+
+        const { error } = await supabaseAdmin.storage
+            .from(THUMBNAILS_BUCKET)
+            .remove([filePath])
+
+        return !error
+    } catch {
+        return false
+    }
+}
