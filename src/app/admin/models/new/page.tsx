@@ -12,6 +12,60 @@ interface Tag {
     color: string
 }
 
+// Função para comprimir imagem
+async function compressImage(file: File, maxSizeKB: number = 300): Promise<File> {
+    return new Promise((resolve) => {
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        const img = new Image()
+
+        img.onload = () => {
+            const maxDim = 800
+            let width = img.width
+            let height = img.height
+
+            if (width > maxDim || height > maxDim) {
+                if (width > height) {
+                    height = (height / width) * maxDim
+                    width = maxDim
+                } else {
+                    width = (width / height) * maxDim
+                    height = maxDim
+                }
+            }
+
+            canvas.width = width
+            canvas.height = height
+            ctx?.drawImage(img, 0, 0, width, height)
+
+            let quality = 0.8
+            const tryCompress = () => {
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const sizeKB = blob.size / 1024
+                        if (sizeKB > maxSizeKB && quality > 0.3) {
+                            quality -= 0.1
+                            tryCompress()
+                        } else {
+                            const compressedFile = new File([blob], file.name, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now()
+                            })
+                            resolve(compressedFile)
+                        }
+                    } else {
+                        resolve(file)
+                    }
+                }, 'image/jpeg', quality)
+            }
+            tryCompress()
+        }
+
+        img.onerror = () => resolve(file)
+        img.src = URL.createObjectURL(file)
+    })
+}
+
 export default function NewModelPage() {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
@@ -43,16 +97,18 @@ export default function NewModelPage() {
         fetchTags()
     }, [])
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0]
-            setThumbnailFile(file)
+            // Comprime a imagem antes de salvar
+            const compressed = await compressImage(file)
+            setThumbnailFile(compressed)
             // Preview
             const reader = new FileReader()
             reader.onload = (ev) => {
                 setThumbnailPreview(ev.target?.result as string)
             }
-            reader.readAsDataURL(file)
+            reader.readAsDataURL(compressed)
         }
     }
 
