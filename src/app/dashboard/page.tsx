@@ -128,7 +128,7 @@ export default function DashboardPage() {
                             iconBgColor="bg-green-500/20"
                             iconColor="text-green-400"
                             credits={10}
-                            comingSoon
+                            isNew
                         />
                     </div>
                 </div>
@@ -186,7 +186,7 @@ export default function DashboardPage() {
                             iconBgColor="bg-violet-500/20"
                             iconColor="text-violet-400"
                             credits={20}
-                            comingSoon
+                            isNew
                         />
                         <DashboardCard
                             title="Clonar Voz"
