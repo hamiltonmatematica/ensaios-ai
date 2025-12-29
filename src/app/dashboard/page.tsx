@@ -9,11 +9,7 @@ import {
     Coins,
     Loader2,
     Wand2,
-    Mic,
-    Video,
     ImagePlus,
-    Scissors,
-    UserCircle,
     Volume2,
     Eraser
 } from "lucide-react"
@@ -144,45 +140,6 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Services Grid - VÍDEO */}
-                <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-                        🎬 Vídeo
-                    </h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <DashboardCard
-                            title="Video Upscale"
-                            description="Aumente vídeos para 4K"
-                            href="/upscale-video"
-                            icon={Video}
-                            iconBgColor="bg-orange-500/20"
-                            iconColor="text-orange-400"
-                            credits={50}
-                            isNew
-                        />
-                        <DashboardCard
-                            title="Video Face Swap"
-                            description="Troque rostos em vídeos"
-                            href="/video-face-swap"
-                            icon={Sparkles}
-                            iconBgColor="bg-red-500/20"
-                            iconColor="text-red-400"
-                            credits={150}
-                            comingSoon
-                        />
-                        <DashboardCard
-                            title="Remover Fundo"
-                            description="Remove background de vídeos"
-                            href="/remove-background"
-                            icon={Scissors}
-                            iconBgColor="bg-cyan-500/20"
-                            iconColor="text-cyan-400"
-                            credits={35}
-                            comingSoon
-                        />
-                    </div>
-                </div>
-
                 {/* Services Grid - ÁUDIO */}
                 <div className="mb-8">
                     <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
@@ -197,26 +154,6 @@ export default function DashboardPage() {
                             iconBgColor="bg-violet-500/20"
                             iconColor="text-violet-400"
                             credits={20}
-                            isNew
-                        />
-                        <DashboardCard
-                            title="Clonar Voz"
-                            description="Clone sua voz para TTS"
-                            href="/voice-clone"
-                            icon={Mic}
-                            iconBgColor="bg-amber-500/20"
-                            iconColor="text-amber-400"
-                            credits={350}
-                            comingSoon
-                        />
-                        <DashboardCard
-                            title="Gerar Avatar"
-                            description="Crie vídeos com lip-sync"
-                            href="/generate-avatar"
-                            icon={UserCircle}
-                            iconBgColor="bg-emerald-500/20"
-                            iconColor="text-emerald-400"
-                            credits={100}
                             isNew
                         />
                     </div>
