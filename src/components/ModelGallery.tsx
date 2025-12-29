@@ -155,13 +155,9 @@ export default function ModelGallery({ selectedModelId, onSelectModel }: ModelGa
                                         <span className="bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
                                             Grátis
                                         </span>
-                                    ) : model.isPremium ? (
+                                    ) : model.isPremium && (
                                         <span className="bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border border-purple-400/30 backdrop-blur-md">
                                             Premium
-                                        </span>
-                                    ) : (
-                                        <span className="bg-zinc-800/80 text-zinc-300 text-[10px] font-medium px-2 py-0.5 rounded-full border border-zinc-600 backdrop-blur-md">
-                                            {model.creditsRequired} Crédito{model.creditsRequired > 1 ? 's' : ''}
                                         </span>
                                     )}
                                 </div>

@@ -419,15 +419,15 @@ export default function TextToSpeechPage() {
                             <div className="space-y-2 text-sm">
                                 <div className="flex justify-between">
                                     <span className="text-zinc-400">Até 100 palavras</span>
-                                    <span className="text-yellow-400 font-semibold">20 cr</span>
+                                    <span className="text-yellow-400 font-semibold">20 créditos</span>
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-zinc-400">Até 500 palavras</span>
-                                    <span className="text-yellow-400 font-semibold">100 cr</span>
+                                    <span className="text-yellow-400 font-semibold">100 créditos</span>
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-zinc-400">Até 1000 palavras</span>
-                                    <span className="text-yellow-400 font-semibold">200 cr</span>
+                                    <span className="text-yellow-400 font-semibold">200 créditos</span>
                                 </div>
                             </div>
                         </div>

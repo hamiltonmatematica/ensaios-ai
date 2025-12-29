@@ -220,8 +220,8 @@ export default function EnsaioPage() {
                                         key={ctx.id}
                                         onClick={() => setSelectedContext(ctx.id)}
                                         className={`p-3 rounded-xl border-2 transition-all text-center ${selectedContext === ctx.id
-                                                ? "border-yellow-500 bg-yellow-500/10"
-                                                : "border-zinc-700 hover:border-zinc-600"
+                                            ? "border-yellow-500 bg-yellow-500/10"
+                                            : "border-zinc-700 hover:border-zinc-600"
                                             }`}
                                     >
                                         <span className="text-xl">{ctx.emoji}</span>
@@ -251,12 +251,12 @@ export default function EnsaioPage() {
                                             key={tier.id}
                                             onClick={() => setSelectedTier(tier.id)}
                                             className={`relative p-4 rounded-xl border-2 transition-all ${isSelected
-                                                    ? tier.color === "yellow"
-                                                        ? "border-yellow-500 bg-yellow-500/10"
-                                                        : tier.color === "blue"
-                                                            ? "border-blue-500 bg-blue-500/10"
-                                                            : "border-zinc-500 bg-zinc-500/10"
-                                                    : "border-zinc-700 hover:border-zinc-600"
+                                                ? tier.color === "yellow"
+                                                    ? "border-yellow-500 bg-yellow-500/10"
+                                                    : tier.color === "blue"
+                                                        ? "border-blue-500 bg-blue-500/10"
+                                                        : "border-zinc-500 bg-zinc-500/10"
+                                                : "border-zinc-700 hover:border-zinc-600"
                                                 }`}
                                         >
                                             {tier.recommended && (
@@ -265,16 +265,16 @@ export default function EnsaioPage() {
                                                 </span>
                                             )}
                                             <Icon className={`w-6 h-6 mx-auto mb-2 ${tier.color === "yellow" ? "text-yellow-400"
-                                                    : tier.color === "blue" ? "text-blue-400"
-                                                        : "text-zinc-400"
+                                                : tier.color === "blue" ? "text-blue-400"
+                                                    : "text-zinc-400"
                                                 }`} />
                                             <p className="font-bold text-white">{tier.name}</p>
                                             <p className="text-xs text-zinc-400 mb-2">{tier.description}</p>
                                             <p className={`text-lg font-bold ${tier.color === "yellow" ? "text-yellow-400"
-                                                    : tier.color === "blue" ? "text-blue-400"
-                                                        : "text-zinc-300"
+                                                : tier.color === "blue" ? "text-blue-400"
+                                                    : "text-zinc-300"
                                                 }`}>
-                                                {tier.credits} cr
+                                                {tier.credits} créditos
                                             </p>
                                         </button>
                                     )

@@ -274,7 +274,7 @@ export default function GenerateImagePage() {
                                 >
                                     {QUALITY_OPTIONS.map((q) => (
                                         <option key={q.id} value={q.id}>
-                                            {q.label} ({q.credits} cr) {q.recommended ? "⭐" : ""}
+                                            {q.label} ({q.credits} créditos) {q.recommended ? "⭐" : ""}
                                         </option>
                                     ))}
                                 </select>
@@ -401,7 +401,7 @@ export default function GenerateImagePage() {
                                             </p>
                                             <p className="text-xs text-zinc-500">{q.description}</p>
                                         </div>
-                                        <p className="text-yellow-400 font-bold">{q.credits} cr</p>
+                                        <p className="text-yellow-400 font-bold">{q.credits} créditos</p>
                                     </div>
                                 ))}
                             </div>
