@@ -147,7 +147,7 @@ export default function DashboardPage() {
                             iconBgColor="bg-orange-500/20"
                             iconColor="text-orange-400"
                             credits={50}
-                            comingSoon
+                            isNew
                         />
                         <DashboardCard
                             title="Video Face Swap"
