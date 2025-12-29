@@ -250,13 +250,13 @@ export default function EnsaioPage() {
                                         <button
                                             key={tier.id}
                                             onClick={() => setSelectedTier(tier.id)}
-                                            className={`relative p-4 rounded-xl border-2 transition-all ${isSelected
+                                            className={`relative p-4 rounded-xl border-2 transition-all duration-200 ${isSelected
                                                 ? tier.color === "yellow"
-                                                    ? "border-yellow-500 bg-yellow-500/10"
+                                                    ? "border-yellow-400 bg-yellow-500/20 scale-105 shadow-lg shadow-yellow-500/30 ring-2 ring-yellow-400/50"
                                                     : tier.color === "blue"
-                                                        ? "border-blue-500 bg-blue-500/10"
-                                                        : "border-zinc-500 bg-zinc-500/10"
-                                                : "border-zinc-700 hover:border-zinc-600"
+                                                        ? "border-blue-400 bg-blue-500/20 scale-105 shadow-lg shadow-blue-500/30 ring-2 ring-blue-400/50"
+                                                        : "border-zinc-400 bg-zinc-500/20 scale-105 shadow-lg shadow-zinc-500/30 ring-2 ring-zinc-400/50"
+                                                : "border-zinc-700 hover:border-zinc-500 hover:bg-zinc-800/50"
                                                 }`}
                                         >
                                             {tier.recommended && (
@@ -264,11 +264,11 @@ export default function EnsaioPage() {
                                                     RECOMENDADO
                                                 </span>
                                             )}
-                                            <Icon className={`w-6 h-6 mx-auto mb-2 ${tier.color === "yellow" ? "text-yellow-400"
+                                            <Icon className={`w-6 h-6 mx-auto mb-2 transition-transform ${isSelected ? "scale-110" : ""} ${tier.color === "yellow" ? "text-yellow-400"
                                                 : tier.color === "blue" ? "text-blue-400"
                                                     : "text-zinc-400"
                                                 }`} />
-                                            <p className="font-bold text-white">{tier.name}</p>
+                                            <p className={`font-bold ${isSelected ? "text-white" : "text-zinc-200"}`}>{tier.name}</p>
                                             <p className="text-xs text-zinc-400 mb-2">{tier.description}</p>
                                             <p className={`text-lg font-bold ${tier.color === "yellow" ? "text-yellow-400"
                                                 : tier.color === "blue" ? "text-blue-400"
