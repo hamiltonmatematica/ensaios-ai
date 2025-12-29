@@ -10,7 +10,6 @@ import {
     Loader2,
     Wand2,
     ImagePlus,
-    Volume2,
     Eraser,
     Shirt
 } from "lucide-react"
@@ -151,24 +150,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Services Grid - ÁUDIO */}
-                <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-                        🎧 Áudio
-                    </h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <DashboardCard
-                            title="Text-to-Speech"
-                            description="Transforme texto em áudio natural"
-                            href="/text-to-speech"
-                            icon={Volume2}
-                            iconBgColor="bg-violet-500/20"
-                            iconColor="text-violet-400"
-                            credits={20}
-                            isNew
-                        />
-                    </div>
-                </div>
+
 
                 {/* Quick Stats */}
                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
