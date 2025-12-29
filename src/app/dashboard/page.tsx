@@ -11,7 +11,8 @@ import {
     Wand2,
     ImagePlus,
     Volume2,
-    Eraser
+    Eraser,
+    Shirt
 } from "lucide-react"
 import DashboardCard from "@/components/DashboardCard"
 import Header from "@/components/Header"
@@ -135,6 +136,16 @@ export default function DashboardPage() {
                             iconBgColor="bg-rose-500/20"
                             iconColor="text-rose-400"
                             credits={15}
+                            isNew
+                        />
+                        <DashboardCard
+                            title="Provador Virtual"
+                            description="Prove roupas com IA"
+                            href="/virtual-try-on"
+                            icon={Shirt}
+                            iconBgColor="bg-indigo-500/20"
+                            iconColor="text-indigo-400"
+                            credits={20}
                             isNew
                         />
                     </div>

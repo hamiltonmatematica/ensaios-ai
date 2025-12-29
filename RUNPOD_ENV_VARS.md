@@ -28,6 +28,9 @@ RUNPOD_SADTALKER_ENDPOINT_ID=
 # Inpaint (ComfyUI - usa o mesmo endpoint de imagem)
 RUNPOD_COMFYUI_ID=tddo1t9n1zkjh6
 
+# Virtual Try-On (IDM-VTON)
+RUNPOD_VIRTUAL_TRY_ON_ID=a71bxqwgd57jzz
+
 # Background Removal (RMBG-1.4)
 # Precisa criar no Runpod Hub
 RUNPOD_RMBG_ENDPOINT_ID=

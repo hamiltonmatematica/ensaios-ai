@@ -34,6 +34,7 @@ model User {
   imageUpscales      ImageUpscale[]
   inpaints           Inpaint[]
   avatarGenerations  AvatarGeneration[]
+  virtualTryOns      VirtualTryOn[]
   transcriptions     Transcription[]
 }
 
@@ -296,6 +297,22 @@ model AvatarGeneration {
   createdAt   DateTime @default(now())
   
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Virtual Try-On
+model VirtualTryOn {
+  id              String   @id @default(cuid())
+  userId          String
+  personImageUrl  String   @db.Text
+  garmentImageUrl String   @db.Text
+  category        String   // upper_body, lower_body, dresses
+  resultUrl       String?  @db.Text
+  status          String   @default("pending")
+  creditsUsed     Int
+  runpodJobId     String?
+  createdAt       DateTime @default(now())
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // Transcrição de Áudio
