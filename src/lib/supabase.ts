@@ -1,14 +1,16 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
-// Cliente público (para frontend)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Cliente público (para frontend) - só cria se as variáveis existirem
+export const supabase: SupabaseClient | null = supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey)
+    : null
 
 // Cliente admin (para backend - tem permissão total)
-export const supabaseAdmin = supabaseServiceKey
+export const supabaseAdmin: SupabaseClient | null = supabaseUrl && supabaseServiceKey
     ? createClient(supabaseUrl, supabaseServiceKey)
     : null
 

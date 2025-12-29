@@ -114,10 +114,10 @@ export default function DashboardPage() {
                             <p className="text-sm text-zinc-400">Créditos Usados</p>
                             <p className="text-2xl font-bold text-white">-</p>
                         </div>
-                        <div className="bg-zinc-800/50 rounded-xl p-4">
-                            <p className="text-sm text-zinc-400">Membro Desde</p>
-                            <p className="text-lg font-bold text-white">
-                                {new Date(session.user?.createdAt || Date.now()).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })}
+                        <div className="text-center">
+                            <p className="text-sm text-zinc-400">Seu ID</p>
+                            <p className="text-sm font-medium text-white truncate max-w-[100px]">
+                                {session.user?.id?.slice(0, 8)}...
                             </p>
                         </div>
                     </div>
