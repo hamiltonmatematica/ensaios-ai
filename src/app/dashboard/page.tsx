@@ -14,7 +14,8 @@ import {
     ImagePlus,
     Scissors,
     UserCircle,
-    Volume2
+    Volume2,
+    Eraser
 } from "lucide-react"
 import DashboardCard from "@/components/DashboardCard"
 import Header from "@/components/Header"
@@ -130,6 +131,16 @@ export default function DashboardPage() {
                             credits={10}
                             isNew
                         />
+                        <DashboardCard
+                            title="Inpaint / Remover"
+                            description="Remova objetos de imagens"
+                            href="/inpaint"
+                            icon={Eraser}
+                            iconBgColor="bg-rose-500/20"
+                            iconColor="text-rose-400"
+                            credits={15}
+                            isNew
+                        />
                     </div>
                 </div>
 
@@ -200,13 +211,13 @@ export default function DashboardPage() {
                         />
                         <DashboardCard
                             title="Gerar Avatar"
-                            description="Crie avatares personalizados"
+                            description="Crie vídeos com lip-sync"
                             href="/generate-avatar"
                             icon={UserCircle}
                             iconBgColor="bg-emerald-500/20"
                             iconColor="text-emerald-400"
                             credits={100}
-                            comingSoon
+                            isNew
                         />
                     </div>
                 </div>
