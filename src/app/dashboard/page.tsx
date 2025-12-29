@@ -3,7 +3,19 @@
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { Camera, Sparkles, Coins, Loader2 } from "lucide-react"
+import {
+    Camera,
+    Sparkles,
+    Coins,
+    Loader2,
+    Wand2,
+    Mic,
+    Video,
+    ImagePlus,
+    Scissors,
+    UserCircle,
+    Volume2
+} from "lucide-react"
 import DashboardCard from "@/components/DashboardCard"
 import Header from "@/components/Header"
 import PricingModal from "@/components/PricingModal"
@@ -75,25 +87,126 @@ export default function DashboardPage() {
                     </button>
                 </div>
 
-                {/* Services Grid */}
+                {/* Services Grid - IMAGENS */}
                 <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-white mb-6">Nossos Serviços</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                        🎨 Imagens
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <DashboardCard
-                            title="Ensaio de IA"
-                            description="Envie 3 fotos, escolha o modelo e tenha um ensaio de nível profissional gerado por inteligência artificial."
-                            href="/ensaio"
-                            icon={Camera}
+                            title="Gerar Imagem"
+                            description="Crie imagens HD com IA usando FLUX.1"
+                            href="/generate-image"
+                            icon={Wand2}
                             iconBgColor="bg-purple-500/20"
                             iconColor="text-purple-400"
+                            credits={15}
+                            isNew
+                        />
+                        <DashboardCard
+                            title="Ensaio de IA"
+                            description="Ensaio profissional com suas fotos"
+                            href="/ensaio"
+                            icon={Camera}
+                            iconBgColor="bg-blue-500/20"
+                            iconColor="text-blue-400"
                         />
                         <DashboardCard
                             title="Face Swap"
-                            description="Altere o rosto na foto que desejar. Troque rostos entre imagens de forma rápida e realista."
+                            description="Troque rostos em imagens"
                             href="/face-swap"
                             icon={Sparkles}
                             iconBgColor="bg-pink-500/20"
                             iconColor="text-pink-400"
+                            credits={5}
+                        />
+                        <DashboardCard
+                            title="Upscale Imagem"
+                            description="Aumente resolução até 4x"
+                            href="/upscale-image"
+                            icon={ImagePlus}
+                            iconBgColor="bg-green-500/20"
+                            iconColor="text-green-400"
+                            credits={10}
+                            comingSoon
+                        />
+                    </div>
+                </div>
+
+                {/* Services Grid - VÍDEO */}
+                <div className="mb-8">
+                    <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                        🎬 Vídeo
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <DashboardCard
+                            title="Video Upscale"
+                            description="Aumente vídeos para 4K"
+                            href="/upscale-video"
+                            icon={Video}
+                            iconBgColor="bg-orange-500/20"
+                            iconColor="text-orange-400"
+                            credits={50}
+                            comingSoon
+                        />
+                        <DashboardCard
+                            title="Video Face Swap"
+                            description="Troque rostos em vídeos"
+                            href="/video-face-swap"
+                            icon={Sparkles}
+                            iconBgColor="bg-red-500/20"
+                            iconColor="text-red-400"
+                            credits={150}
+                            comingSoon
+                        />
+                        <DashboardCard
+                            title="Remover Fundo"
+                            description="Remove background de vídeos"
+                            href="/remove-background"
+                            icon={Scissors}
+                            iconBgColor="bg-cyan-500/20"
+                            iconColor="text-cyan-400"
+                            credits={35}
+                            comingSoon
+                        />
+                    </div>
+                </div>
+
+                {/* Services Grid - ÁUDIO */}
+                <div className="mb-8">
+                    <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                        🎧 Áudio
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <DashboardCard
+                            title="Text-to-Speech"
+                            description="Transforme texto em áudio natural"
+                            href="/text-to-speech"
+                            icon={Volume2}
+                            iconBgColor="bg-violet-500/20"
+                            iconColor="text-violet-400"
+                            credits={20}
+                            comingSoon
+                        />
+                        <DashboardCard
+                            title="Clonar Voz"
+                            description="Clone sua voz para TTS"
+                            href="/voice-clone"
+                            icon={Mic}
+                            iconBgColor="bg-amber-500/20"
+                            iconColor="text-amber-400"
+                            credits={350}
+                            comingSoon
+                        />
+                        <DashboardCard
+                            title="Gerar Avatar"
+                            description="Crie avatares personalizados"
+                            href="/generate-avatar"
+                            icon={UserCircle}
+                            iconBgColor="bg-emerald-500/20"
+                            iconColor="text-emerald-400"
+                            credits={100}
+                            comingSoon
                         />
                     </div>
                 </div>
