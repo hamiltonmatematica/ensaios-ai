@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { signIn, signOut, useSession } from "next-auth/react"
-import { Coins, LogOut, User, Menu, X, Camera, MessageCircle, Sparkles } from "lucide-react"
+import { Coins, LogOut, User, Menu, X, Camera, MessageCircle, Sparkles, Calendar } from "lucide-react"
 
 interface HeaderProps {
     onOpenPricing: () => void
@@ -70,8 +70,8 @@ export default function Header({ onOpenPricing, onOpenLogin }: HeaderProps) {
                                 Dashboard
                             </a>
 
-                            <a href="/face-swap" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">
-                                Face Swap
+                            <a href="/history" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">
+                                Histórico
                             </a>
 
                             <a href="/support" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">
@@ -144,12 +144,13 @@ export default function Header({ onOpenPricing, onOpenLogin }: HeaderProps) {
                                 <Camera className="w-5 h-5" />
                                 Dashboard
                             </a>
+
                             <a
-                                href="/face-swap"
+                                href="/history"
                                 className="flex items-center gap-3 px-4 py-3 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
                             >
-                                <Sparkles className="w-5 h-5" />
-                                Face Swap
+                                <Calendar className="w-5 h-5" />
+                                Histórico
                             </a>
                             <a
                                 href="/support"

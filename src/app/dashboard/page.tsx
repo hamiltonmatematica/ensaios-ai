@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import DashboardCard from "@/components/DashboardCard"
 import Header from "@/components/Header"
+
 import PricingModal from "@/components/PricingModal"
 import LoginModal from "@/components/LoginModal"
 import { useState } from "react"
@@ -151,31 +152,6 @@ export default function DashboardPage() {
                 </div>
 
 
-
-                {/* Quick Stats */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-                    <h2 className="text-lg font-semibold text-white mb-4">Suas Estatísticas</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-zinc-800/50 rounded-xl p-4">
-                            <p className="text-sm text-zinc-400">Ensaios Gerados</p>
-                            <p className="text-2xl font-bold text-white">-</p>
-                        </div>
-                        <div className="bg-zinc-800/50 rounded-xl p-4">
-                            <p className="text-sm text-zinc-400">Face Swaps</p>
-                            <p className="text-2xl font-bold text-white">-</p>
-                        </div>
-                        <div className="bg-zinc-800/50 rounded-xl p-4">
-                            <p className="text-sm text-zinc-400">Créditos Usados</p>
-                            <p className="text-2xl font-bold text-white">-</p>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-sm text-zinc-400">Seu ID</p>
-                            <p className="text-sm font-medium text-white truncate max-w-[100px]">
-                                {session.user?.id?.slice(0, 8)}...
-                            </p>
-                        </div>
-                    </div>
-                </div>
             </main>
 
             <PricingModal
