@@ -107,6 +107,18 @@ export default function UpscaleImagePage() {
 
             const jobId = data.jobId
 
+            // Se o resultado já vier na resposta (síncrono)
+            if (data.resultUrl) {
+                setResult({
+                    id: jobId,
+                    resultUrl: data.resultUrl,
+                })
+                setProcessingStatus("")
+                setIsProcessing(false)
+                await updateSession()
+                return
+            }
+
             // Polling
             setProcessingStatus("Processando imagem...")
             const pollInterval = setInterval(async () => {
@@ -210,8 +222,8 @@ export default function UpscaleImagePage() {
                         {/* Upload Area */}
                         <div
                             className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all ${image
-                                    ? "border-green-500/50 bg-green-500/5"
-                                    : "border-zinc-700 hover:border-zinc-600"
+                                ? "border-green-500/50 bg-green-500/5"
+                                : "border-zinc-700 hover:border-zinc-600"
                                 }`}
                         >
                             <input
@@ -260,8 +272,8 @@ export default function UpscaleImagePage() {
                                         onClick={() => setScale(option.id)}
                                         disabled={isProcessing}
                                         className={`p-4 rounded-xl border-2 transition-all ${scale === option.id
-                                                ? "border-green-500 bg-green-500/10"
-                                                : "border-zinc-700 hover:border-zinc-600"
+                                            ? "border-green-500 bg-green-500/10"
+                                            : "border-zinc-700 hover:border-zinc-600"
                                             }`}
                                     >
                                         <p className="text-2xl font-bold text-white">{option.label}</p>

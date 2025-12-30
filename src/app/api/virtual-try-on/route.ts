@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
         console.log("Chamando RunPod Virtual Try-On:", RUNPOD_VIRTUAL_TRY_ON_ID)
 
         const runpodResponse = await fetch(
-            `https://api.runpod.io/v2/${RUNPOD_VIRTUAL_TRY_ON_ID}/run`,
+            `https://api.runpod.ai/v2/${RUNPOD_VIRTUAL_TRY_ON_ID}/run`,
             {
                 method: "POST",
                 headers: {

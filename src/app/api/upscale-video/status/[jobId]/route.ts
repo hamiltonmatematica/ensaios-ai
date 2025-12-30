@@ -67,7 +67,7 @@ export async function GET(
         }
 
         const runpodResponse = await fetch(
-            `https://api.runpod.io/v2/${RUNPOD_VIDEO_UPSCALE_ID}/status/${upscaleJob.runpodJobId}`,
+            `https://api.runpod.ai/v2/${RUNPOD_VIDEO_UPSCALE_ID}/status/${upscaleJob.runpodJobId}`,
             {
                 method: "GET",
                 headers: {

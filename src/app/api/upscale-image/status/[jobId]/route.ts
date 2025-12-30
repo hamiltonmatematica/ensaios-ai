@@ -67,7 +67,7 @@ export async function GET(
         }
 
         const runpodResponse = await fetch(
-            `https://api.runpod.io/v2/${RUNPOD_UPSCALER_ID}/status/${upscaleJob.runpodJobId}`,
+            `https://api.runpod.ai/v2/${RUNPOD_UPSCALER_ID}/status/${upscaleJob.runpodJobId}`,
             {
                 method: "GET",
                 headers: {
@@ -85,8 +85,13 @@ export async function GET(
 
         const runpodData = await runpodResponse.json()
 
+        console.log("[UPSCALE STATUS] RunPod response:", JSON.stringify(runpodData, null, 2))
+
         if (runpodData.status === "COMPLETED") {
             let resultUrl = null
+
+            console.log("[UPSCALE STATUS] Output type:", typeof runpodData.output)
+            console.log("[UPSCALE STATUS] Output:", runpodData.output)
 
             if (runpodData.output) {
                 if (typeof runpodData.output === "string") {
@@ -96,12 +101,22 @@ export async function GET(
                     } else {
                         resultUrl = runpodData.output
                     }
+                } else if (runpodData.output.image_base64) {
+                    // Base64 direto
+                    resultUrl = `data:image/png;base64,${runpodData.output.image_base64}`
                 } else if (runpodData.output.image) {
                     resultUrl = runpodData.output.image
                 } else if (runpodData.output.url) {
                     resultUrl = runpodData.output.url
+                } else if (runpodData.output.image_path) {
+                    // RunPod retorna image_path - endpoint não suporta download direto
+                    // Precisamos configurar o input original para retornar base64
+                    console.error("[UPSCALE STATUS] Got image_path but cannot download. Need to fix input request.")
+                    resultUrl = null // Forçar erro para que usuário saiba que precisa correção
                 }
             }
+
+            console.log("[UPSCALE STATUS] Final resultUrl:", resultUrl?.substring(0, 100))
 
             // Atualizar banco
             await prisma.imageUpscale.update({

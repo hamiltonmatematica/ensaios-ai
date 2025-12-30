@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         console.log("Chamando RunPod SadTalker:", RUNPOD_SADTALKER_ID)
 
         const runpodResponse = await fetch(
-            `https://api.runpod.io/v2/${RUNPOD_SADTALKER_ID}/run`,
+            `https://api.runpod.ai/v2/${RUNPOD_SADTALKER_ID}/run`,
             {
                 method: "POST",
                 headers: {
