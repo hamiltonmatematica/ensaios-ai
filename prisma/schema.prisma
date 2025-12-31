@@ -190,6 +190,7 @@ model ImageGeneration {
   status          String   @default("pending")
   creditsUsed     Int      @default(15)
   runpodJobId     String?
+  errorMessage    String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
@@ -239,6 +240,7 @@ model VideoUpscale {
   status      String   @default("pending")
   creditsUsed Int
   runpodJobId String?
+  errorMessage String?
   createdAt   DateTime @default(now())
   
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -255,6 +257,7 @@ model VideoFaceSwap {
   status          String   @default("pending")
   creditsUsed     Int
   runpodJobId     String?
+  errorMessage    String?
   createdAt       DateTime @default(now())
   
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -270,6 +273,7 @@ model ImageUpscale {
   status      String   @default("pending")
   creditsUsed Int
   runpodJobId String?
+  errorMessage String?
   createdAt   DateTime @default(now())
   
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -285,6 +289,7 @@ model Inpaint {
   status      String   @default("pending")
   creditsUsed Int
   runpodJobId String?
+  errorMessage String?
   createdAt   DateTime @default(now())
   
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -300,6 +305,7 @@ model AvatarGeneration {
   status      String   @default("pending")
   creditsUsed Int
   runpodJobId String?
+  errorMessage String?
   createdAt   DateTime @default(now())
   
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -316,6 +322,7 @@ model VirtualTryOn {
   status          String   @default("pending")
   creditsUsed     Int
   runpodJobId     String?
+  errorMessage    String?
   createdAt       DateTime @default(now())
   
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -333,6 +340,7 @@ model Transcription {
   status      String   @default("pending")
   creditsUsed Int
   runpodJobId String?
+  errorMessage String?
   createdAt   DateTime @default(now())
   
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
