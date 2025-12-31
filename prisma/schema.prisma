@@ -36,6 +36,12 @@ model User {
   avatarGenerations  AvatarGeneration[]
   virtualTryOns      VirtualTryOn[]
   transcriptions     Transcription[]
+  
+  // Credit System
+  creditBalance       CreditBalance?
+  creditTransactions  CreditTransaction[]
+  subscription        UserSubscription?
+  purchaseHistory     CreditPurchaseHistory[]
 }
 
 model FaceSwapJob {
@@ -330,4 +336,70 @@ model Transcription {
   createdAt   DateTime @default(now())
   
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// CREDIT SYSTEM MODELS
+// ============================================
+
+// Saldo total de créditos por usuário
+model CreditBalance {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  totalCredits Int      @default(0)
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Histórico de transações de créditos
+model CreditTransaction {
+  id          String    @id @default(cuid())
+  userId      String
+  type        String    // PURCHASE, CONSUMPTION, BONUS, REFUND
+  amount      Int       // Positivo para entrada, negativo para saída
+  source      String?   // SUBSCRIPTION_MASTER, AVULSO, MIGRATION_V1, etc
+  featureUsed String?   // Para CONSUMPTION: qual feature foi usada
+  status      String    // ACTIVE, USED, EXPIRED
+  expiresAt   DateTime? // null = não expira (Master)
+  createdAt   DateTime  @default(now())
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, status])
+  @@index([expiresAt])
+}
+
+// Assinatura do usuário
+model UserSubscription {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  planType         String    // BASICO, PADRAO, MASTER
+  isActive         Boolean   @default(true)
+  stripeCustomerId String?
+  stripePriceId    String?
+  currentPeriodEnd DateTime?
+  cancelAtPeriodEnd Boolean  @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Histórico de compras de créditos
+model CreditPurchaseHistory {
+  id              String   @id @default(cuid())
+  userId          String
+  stripePaymentId String   @unique
+  amount          Float    // Valor em reais
+  creditsGranted  Int
+  planType        String?  // BASICO, PADRAO, MASTER, AVULSO
+  status          String   // PENDING, COMPLETED, FAILED, REFUNDED
+  createdAt       DateTime @default(now())
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([status])
 }
