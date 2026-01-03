@@ -87,7 +87,7 @@ export default function DashboardPage() {
                     <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
                         🎨 Imagens
                     </h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         <DashboardCard
                             title="Ensaio de IA"
                             description="Ensaio profissional com suas fotos"
@@ -113,16 +113,6 @@ export default function DashboardPage() {
                             iconBgColor="bg-green-500/20"
                             iconColor="text-green-400"
                             credits={10}
-                            isNew
-                        />
-                        <DashboardCard
-                            title="Efeitos Artísticos"
-                            description="Transforme fotos em arte"
-                            href="/art-effects"
-                            icon={Sparkles}
-                            iconBgColor="bg-purple-500/20"
-                            iconColor="text-purple-400"
-                            credits={35}
                             isNew
                         />
                     </div>

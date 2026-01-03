@@ -24,15 +24,13 @@ type HistoryItem = {
 }
 
 const TABS = [
-    { id: "image-generation", label: "Imagens", icon: Wand2 },
-    { id: "upscale", label: "Upscale", icon: ImageIcon },
+    { id: "generations", label: "Ensaio de IA", icon: Wand2 },
     { id: "face-swap", label: "Face Swap", icon: Sparkles },
-    { id: "inpaint", label: "Inpaint", icon: Eraser },
-    { id: "virtual-try-on", label: "Provador", icon: Shirt },
+    { id: "upscale", label: "Upscale", icon: ImageIcon },
 ]
 
 export default function HistorySection() {
-    const [activeTab, setActiveTab] = useState("image-generation")
+    const [activeTab, setActiveTab] = useState("generations")
     const [items, setItems] = useState<HistoryItem[]>([])
     const [loading, setLoading] = useState(false)
 
