@@ -7,10 +7,7 @@ import { NextRequest, NextResponse } from "next/server"
 export const dynamic = 'force-dynamic'
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY
-// Usar o ID fornecido no prompt ou ler do env. 
-// O usuário pediu para ler RUNPOD_UPSCALE_ENDPOINT_ID, mas já adicionei ao env.
-// Fallback para o ID hardcoded caso env não carregue a tempo (segurança)
-const RUNPOD_UPSCALE_ENDPOINT_ID = process.env.RUNPOD_UPSCALE_ENDPOINT_ID || "kk5a0i7oi7tess"
+const RUNPOD_UPSCALE_ENDPOINT_ID = process.env.RUNPOD_UPSCALE_ENDPOINT_ID || "qqx0my03hxzi5k"
 
 // Créditos por escala
 const CREDITS_BY_SCALE: Record<string, number> = {
@@ -21,14 +18,6 @@ const CREDITS_BY_SCALE: Record<string, number> = {
 // Utility functions
 function cleanBase64(data: string): string {
     return data.replace(/^data:image\/[a-zA-Z]+;base64,/, "")
-}
-
-function wrapAsDataUrl(b64: string): string {
-    return `data:image/png;base64,${b64}`
-}
-
-function getModelByFactor(factor: 2 | 4): string {
-    return factor === 4 ? "RealESRGAN_x4plus" : "RealESRGAN_x2plus"
 }
 
 export async function POST(request: NextRequest) {
@@ -44,7 +33,7 @@ export async function POST(request: NextRequest) {
 
         // 2. Validar input
         const body = await request.json()
-        const { image, scale } = body // Frontend envia 'image' e 'scale' ("2x" ou "4x")
+        const { image, scale } = body
 
         if (!image) {
             return NextResponse.json(
@@ -64,22 +53,21 @@ export async function POST(request: NextRequest) {
             data: {
                 userId: session.user.id,
                 status: "processing",
-                imageUrl: image, // Salvar o base64 original (data URL)
-                scale: scale || "4x", // String "2x" ou "4x"
-                creditsUsed: creditsRequired, // Nome correto do campo no schema
-                runpodJobId: `sync-${Date.now()}`,
+                imageUrl: image,
+                scale: scale || "4x",
+                creditsUsed: creditsRequired,
+                runpodJobId: `pending-${Date.now()}`,
             }
         })
 
         // 5. Preparar payload para Real-ESRGAN
         const cleanImage = cleanBase64(image)
-        const modelName = getModelByFactor(factor)
 
-        console.log(`[UPSCALE] Chamando Real-ESRGAN (${modelName}) no endpoint ${RUNPOD_UPSCALE_ENDPOINT_ID}`)
+        console.log(`[UPSCALE] Chamando Real-ESRGAN ${scale} no endpoint ${RUNPOD_UPSCALE_ENDPOINT_ID}`)
 
-        // 6. Chamar RunPod (Síncrono)
+        // 6. Chamar RunPod (Assíncrono)
         const runpodResponse = await fetch(
-            `https://api.runpod.ai/v2/${RUNPOD_UPSCALE_ENDPOINT_ID}/runsync`,
+            `https://api.runpod.ai/v2/${RUNPOD_UPSCALE_ENDPOINT_ID}/run`,
             {
                 method: "POST",
                 headers: {
@@ -89,13 +77,13 @@ export async function POST(request: NextRequest) {
                 body: JSON.stringify({
                     input: {
                         source_image: cleanImage,
-                        model: modelName,
                         scale: factor,
-                        face_enhance: false // Opcional, mantendo false por enquanto
                     }
                 }),
             }
         )
+
+        console.log("[UPSCALE] RunPod response status:", runpodResponse.status)
 
         if (!runpodResponse.ok) {
             const errorText = await runpodResponse.text()
@@ -113,61 +101,24 @@ export async function POST(request: NextRequest) {
         }
 
         const runpodData = await runpodResponse.json()
-        console.log("[UPSCALE] RunPod response status:", runpodData.status)
+        console.log("[UPSCALE] RunPod job criado:", runpodData.id, "status:", runpodData.status)
 
-        // 7. Processar resposta
-        if (runpodData.status === "COMPLETED" || runpodData.output?.status === "ok") {
-            const rawB64 = runpodData.output?.image
-
-            if (!rawB64) {
-                console.error("[UPSCALE] Resposta sem imagem:", runpodData)
-                await prisma.imageUpscale.update({
-                    where: { id: job.id },
-                    data: { status: "failed", errorMessage: "Resposta sem imagem" }
-                })
-                return NextResponse.json(
-                    { error: "Falha ao obter imagem upscalada." },
-                    { status: 500 }
-                )
+        // 7. Atualizar job com ID do RunPod
+        await prisma.imageUpscale.update({
+            where: { id: job.id },
+            data: {
+                runpodJobId: runpodData.id,
+                status: "processing"
             }
+        })
 
-            const resultUrl = wrapAsDataUrl(rawB64)
-
-            // 8. Atualizar banco e debitar créditos
-            await prisma.imageUpscale.update({
-                where: { id: job.id },
-                data: {
-                    status: "completed",
-                    resultUrl: resultUrl,
-                    runpodJobId: runpodData.id // Atualizar com ID real se disponível
-                }
-            })
-
-            await CreditService.consumeCredits(
-                session.user.id,
-                creditsRequired,
-                "UPSCALE_IMAGEM"
-            )
-
-            // 9. Retornar sucesso
-            return NextResponse.json({
-                success: true,
-                jobId: job.id,
-                resultUrl: resultUrl,
-                upscaledImageBase64: resultUrl
-            })
-
-        } else {
-            console.error("[UPSCALE] Job falhou:", runpodData)
-            await prisma.imageUpscale.update({
-                where: { id: job.id },
-                data: { status: "failed", errorMessage: JSON.stringify(runpodData.error || "Unknown error") }
-            })
-            return NextResponse.json(
-                { error: "Falha no processamento da imagem." },
-                { status: 500 }
-            )
-        }
+        // 8. Retornar job ID para polling (não debita créditos ainda)
+        return NextResponse.json({
+            success: true,
+            jobId: job.id,
+            runpodJobId: runpodData.id,
+            status: runpodData.status
+        })
 
     } catch (error: unknown) {
         console.error("[UPSCALE] Erro interno:", error)

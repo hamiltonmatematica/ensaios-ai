@@ -39,8 +39,10 @@ export default function UpscaleImagePage() {
     const [error, setError] = useState<string | null>(null)
     const [isPricingOpen, setIsPricingOpen] = useState(false)
     const [showLoginModal, setShowLoginModal] = useState(false)
+    const [retryCount, setRetryCount] = useState(0)
 
     const currentCredits = SCALE_OPTIONS.find(s => s.id === scale)?.credits || 20
+    const MAX_RETRIES = 12 // 12 tentativas x 5s = 60 segundos
 
     useEffect(() => {
         if (status === "unauthenticated") {
@@ -100,6 +102,30 @@ export default function UpscaleImagePage() {
             })
 
             const data = await res.json()
+
+            // Tratar cold start - servidor inicializando
+            if (res.status === 503 && data.coldStart) {
+                // Verificar limite de tentativas
+                if (retryCount >= MAX_RETRIES) {
+                    setError(`Endpoint demorando muito para inicializar (${retryCount} tentativas). Aguarde alguns minutos ou verifique o painel do RunPod.`)
+                    setIsProcessing(false)
+                    setProcessingStatus("")
+                    setRetryCount(0)
+                    return
+                }
+
+                const retryAfter = data.retryAfter || 5
+                setRetryCount(prev => prev + 1)
+                setProcessingStatus(`Servidor inicializando... Tentativa ${retryCount + 1}/${MAX_RETRIES}`)
+
+                setTimeout(() => {
+                    handleUpscale() // Retry recursivo
+                }, retryAfter * 1000)
+                return
+            }
+
+            // Reset retry counter em caso de sucesso
+            setRetryCount(0)
 
             if (!res.ok) {
                 throw new Error(data.error || "Erro ao fazer upscale")

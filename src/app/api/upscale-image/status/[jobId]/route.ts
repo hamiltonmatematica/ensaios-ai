@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server"
 export const dynamic = 'force-dynamic'
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY
-const RUNPOD_UPSCALER_ID = process.env.RUNPOD_UPSCALER_ID || process.env.RUNPOD_UPSCALE_ENDPOINT_ID
+const RUNPOD_UPSCALE_ENDPOINT_ID = process.env.RUNPOD_UPSCALE_ENDPOINT_ID || "eyoku6bop62rtq"
 
 export async function GET(
     request: NextRequest,
@@ -60,14 +60,14 @@ export async function GET(
         }
 
         // Consultar RunPod
-        if (!upscaleJob.runpodJobId || !RUNPOD_UPSCALER_ID) {
+        if (!upscaleJob.runpodJobId || !RUNPOD_UPSCALE_ENDPOINT_ID) {
             return NextResponse.json({
                 status: upscaleJob.status,
             })
         }
 
         const runpodResponse = await fetch(
-            `https://api.runpod.ai/v2/${RUNPOD_UPSCALER_ID}/status/${upscaleJob.runpodJobId}`,
+            `https://api.runpod.ai/v2/${RUNPOD_UPSCALE_ENDPOINT_ID}/status/${upscaleJob.runpodJobId}`,
             {
                 method: "GET",
                 headers: {
@@ -88,32 +88,26 @@ export async function GET(
         console.log("[UPSCALE STATUS] RunPod response:", JSON.stringify(runpodData, null, 2))
 
         if (runpodData.status === "COMPLETED") {
-            let resultUrl = null
+            // Extrai resultado - pode vir como output.output ou output diretamente (igual ao face-swap)
+            let resultUrl = runpodData.output?.output || runpodData.output
 
-            console.log("[UPSCALE STATUS] Output type:", typeof runpodData.output)
-            console.log("[UPSCALE STATUS] Output:", runpodData.output)
+            console.log("[UPSCALE STATUS] Raw output type:", typeof resultUrl)
+            console.log("[UPSCALE STATUS] Raw output (first 100 chars):", typeof resultUrl === 'string' ? resultUrl.substring(0, 100) : resultUrl)
 
-            if (runpodData.output) {
-                if (typeof runpodData.output === "string") {
-                    // Se for base64, converter para data URL
-                    if (!runpodData.output.startsWith("http")) {
-                        resultUrl = `data:image/png;base64,${runpodData.output}`
-                    } else {
-                        resultUrl = runpodData.output
-                    }
-                } else if (runpodData.output.image_base64) {
-                    // Base64 direto
-                    resultUrl = `data:image/png;base64,${runpodData.output.image_base64}`
-                } else if (runpodData.output.image) {
-                    resultUrl = runpodData.output.image
-                } else if (runpodData.output.url) {
-                    resultUrl = runpodData.output.url
-                } else if (runpodData.output.image_path) {
-                    // RunPod retorna image_path - endpoint não suporta download direto
-                    // Precisamos configurar o input original para retornar base64
-                    console.error("[UPSCALE STATUS] Got image_path but cannot download. Need to fix input request.")
-                    resultUrl = null // Forçar erro para que usuário saiba que precisa correção
+            // Se for objeto com image ou image_base64, pega o valor
+            if (typeof resultUrl === "object" && resultUrl !== null) {
+                if (resultUrl.image) {
+                    resultUrl = resultUrl.image
+                } else if (resultUrl.image_base64) {
+                    resultUrl = resultUrl.image_base64
+                } else {
+                    console.error("[UPSCALE STATUS] Output is object but has no expected field. Keys:", Object.keys(resultUrl))
                 }
+            }
+
+            // Adiciona prefixo base64 se necessário
+            if (resultUrl && typeof resultUrl === "string" && !resultUrl.startsWith("data:") && !resultUrl.startsWith("http")) {
+                resultUrl = `data:image/png;base64,${resultUrl}`
             }
 
             console.log("[UPSCALE STATUS] Final resultUrl:", resultUrl?.substring(0, 100))

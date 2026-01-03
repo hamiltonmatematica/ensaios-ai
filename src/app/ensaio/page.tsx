@@ -27,7 +27,7 @@ const QUALITY_TIERS = [
     {
         id: "standard",
         name: "Standard",
-        credits: 1,
+        credits: 2,
         description: "Qualidade padrão",
         features: ["1 imagem gerada", "Resolução 512px"],
         icon: Star,
@@ -36,7 +36,7 @@ const QUALITY_TIERS = [
     {
         id: "enhanced",
         name: "Enhanced",
-        credits: 3,
+        credits: 6,
         description: "Com upscale 2x",
         features: ["1 imagem gerada", "Upscale 2x HD", "1024px resolução"],
         icon: Sparkles,
@@ -46,7 +46,7 @@ const QUALITY_TIERS = [
     {
         id: "premium",
         name: "Premium",
-        credits: 5,
+        credits: 10,
         description: "Qualidade máxima",
         features: ["1 imagem gerada", "Upscale 4K", "Inpaint refinado", "Melhor qualidade"],
         icon: Zap,
