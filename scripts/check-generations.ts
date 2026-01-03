@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function checkLatestGenerations() {
-    const latest = await prisma.imageGeneration.findMany({
+    const latest = await prisma.generation.findMany({
         orderBy: { createdAt: 'desc' },
         take: 3,
         select: {
