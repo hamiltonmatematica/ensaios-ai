@@ -10,7 +10,8 @@ async function checkLatestGenerations() {
             id: true,
             status: true,
             resultUrl: true,
-            runpodJobId: true,
+            status: true,
+            resultUrl: true,
             createdAt: true,
         }
     })
@@ -20,7 +21,6 @@ async function checkLatestGenerations() {
         console.log(`#${index + 1}:`)
         console.log(`  ID: ${gen.id}`)
         console.log(`  Status: ${gen.status}`)
-        console.log(`  RunPod Job ID: ${gen.runpodJobId}`)
         console.log(`  ResultURL: ${gen.resultUrl || '(NULL)'}`)
         console.log(`  Created: ${gen.createdAt}`)
         console.log('')
