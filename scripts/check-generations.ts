@@ -10,8 +10,6 @@ async function checkLatestGenerations() {
             id: true,
             status: true,
             resultUrl: true,
-            status: true,
-            resultUrl: true,
             createdAt: true,
         }
     })
