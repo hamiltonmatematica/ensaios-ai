@@ -27,7 +27,8 @@ export const authOptions: NextAuthOptions = {
 
                 // Busca usuário
                 const user = await prisma.user.findUnique({
-                    where: { email }
+                    where: { email },
+                    include: { creditBalance: true } // Incluir saldo
                 })
 
                 if (!user || !user.password) {
@@ -41,12 +42,14 @@ export const authOptions: NextAuthOptions = {
                     return null
                 }
 
+                const credits = user.creditBalance?.totalCredits ?? user.credits ?? 0
+
                 return {
                     id: user.id,
                     email: user.email,
                     name: user.name,
                     image: user.image,
-                    credits: user.credits,
+                    credits: credits,
                     role: user.role,
                 }
             }
@@ -67,12 +70,16 @@ export const authOptions: NextAuthOptions = {
 
                 if (!existingUser) {
                     // Cria novo usuário com 3 créditos gratuitos
+                    // Em V2, criamos também o CreditBalance
                     await prisma.user.create({
                         data: {
                             email: user.email,
                             name: user.name || "",
                             image: user.image || "",
                             credits: 3,
+                            creditBalance: {
+                                create: { totalCredits: 3 }
+                            }
                         }
                     })
                 }
@@ -82,22 +89,31 @@ export const authOptions: NextAuthOptions = {
         },
         async jwt({ token, user }) {
             if (user) {
+                // Primeira vez (login)
+                // Se o user veio do authorize, já tem os dados corretos
+                // Se veio do GoogleProvider, precisamos buscar
                 const dbUser = await prisma.user.findUnique({
-                    where: { email: user.email as string }
+                    where: { email: user.email as string },
+                    include: { creditBalance: true }
                 })
+
                 if (dbUser) {
                     token.id = dbUser.id
-                    token.credits = dbUser.credits
+                    token.credits = dbUser.creditBalance?.totalCredits ?? dbUser.credits ?? 0
                     token.role = dbUser.role
                 }
             } else if (token.id) {
-                // Atualizações subsequentes (sem 'user')
+                // Atualizações subsequentes (sem 'user') - polling da sessão
                 const dbUser = await prisma.user.findUnique({
                     where: { id: token.id as string },
-                    select: { credits: true, role: true }
+                    select: {
+                        credits: true,
+                        role: true,
+                        creditBalance: { select: { totalCredits: true } }
+                    }
                 })
                 if (dbUser) {
-                    token.credits = dbUser.credits
+                    token.credits = dbUser.creditBalance?.totalCredits ?? dbUser.credits ?? 0
                     token.role = dbUser.role
                 }
             }

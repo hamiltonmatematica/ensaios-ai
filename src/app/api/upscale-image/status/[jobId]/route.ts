@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { CreditService } from "@/lib/credit-service"
 import { NextRequest, NextResponse } from "next/server"
 
 export const dynamic = 'force-dynamic'
@@ -121,13 +122,17 @@ export async function GET(
                 },
             })
 
-            // Deduzir créditos
-            await prisma.user.update({
-                where: { id: session.user.id },
-                data: {
-                    credits: { decrement: upscaleJob.creditsUsed },
-                },
-            })
+            // Deduzir créditos usando CreditService
+            try {
+                await CreditService.consumeCredits(
+                    session.user.id,
+                    upscaleJob.creditsUsed,
+                    `UPSCALE_${upscaleJob.scale}`
+                )
+            } catch (error) {
+                console.error("Erro ao debitar créditos (Upscale):", error)
+                // Não falha o job, mas loga erro crítico
+            }
 
             return NextResponse.json({
                 status: "COMPLETED",

@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { CreditService } from "@/lib/credit-service"
 import { NextRequest, NextResponse } from "next/server"
 
 // Evita pre-rendering durante build
@@ -8,6 +9,8 @@ export const dynamic = 'force-dynamic'
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY
 const RUNPOD_ENDPOINT_ID = process.env.RUNPOD_ENDPOINT_ID || "h9fyw7xb7dagyu"
+
+const COST_CREDITS = 5
 
 export async function POST(request: NextRequest) {
     try {
@@ -42,14 +45,13 @@ export async function POST(request: NextRequest) {
         }
 
         // Verifica créditos
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { credits: true },
-        })
-
-        if (!user || user.credits < 1) {
+        try {
+            await CreditService.assertUserHasCredits(session.user.id, COST_CREDITS)
+        } catch (e) {
+            // Busca saldo atual para mensagem de erro
+            const balance = await CreditService.getBalance(session.user.id)
             return NextResponse.json(
-                { error: "Créditos insuficientes.", required: 1, available: user?.credits || 0 },
+                { error: "Créditos insuficientes.", required: COST_CREDITS, available: balance.totalCredits },
                 { status: 402 }
             )
         }
@@ -70,8 +72,6 @@ export async function POST(request: NextRequest) {
 
         // Chama API RunPod
         console.log("Chamando RunPod com endpoint:", RUNPOD_ENDPOINT_ID)
-        console.log("API Key completa:", RUNPOD_API_KEY)
-        console.log("API Key length:", RUNPOD_API_KEY?.length)
 
         const runpodResponse = await fetch(
             `https://api.runpod.ai/v2/${RUNPOD_ENDPOINT_ID}/run`,

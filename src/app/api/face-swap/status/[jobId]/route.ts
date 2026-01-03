@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { CreditService } from "@/lib/credit-service"
 import { NextRequest, NextResponse } from "next/server"
 
 // Evita pre-rendering durante build
@@ -8,6 +9,8 @@ export const dynamic = 'force-dynamic'
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY
 const RUNPOD_ENDPOINT_ID = process.env.RUNPOD_ENDPOINT_ID || "h9fyw7xb7dagyu"
+
+const COST_CREDITS = 5
 
 export async function GET(
     request: NextRequest,
@@ -104,11 +107,13 @@ export async function GET(
                 },
             })
 
-            // Deduz crédito
-            await prisma.user.update({
-                where: { id: session.user.id },
-                data: { credits: { decrement: 1 } },
-            })
+            // Deduz crédito com o novo serviço
+            try {
+                await CreditService.consumeCredits(session.user.id, COST_CREDITS, "FACE_SWAP")
+            } catch (error) {
+                console.error("Erro ao debitar créditos (Face Swap):", error)
+                // Não falha o job por erro de débito POSTERIOR, mas loga.
+            }
 
             return NextResponse.json({
                 status: "COMPLETED",

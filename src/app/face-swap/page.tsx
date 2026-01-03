@@ -202,7 +202,7 @@ export default function FaceSwapPage() {
             return
         }
 
-        if ((session.user.credits ?? 0) < 1) {
+        if ((session.user.credits ?? 0) < 5) {
             setIsPricingOpen(true)
             return
         }
@@ -334,7 +334,7 @@ export default function FaceSwapPage() {
                     </h1>
                     <p className="text-zinc-400 max-w-xl mx-auto mb-4">
                         Troque rostos entre imagens de forma rápida e realista usando inteligência artificial.
-                        Custo: <span className="text-yellow-400 font-semibold">1 crédito</span>
+                        Custo: <span className="text-yellow-400 font-semibold">5 créditos</span>
                     </p>
                     <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 max-w-xl mx-auto text-left space-y-2">
                         <p className="text-sm text-zinc-300">
@@ -575,7 +575,7 @@ export default function FaceSwapPage() {
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-white">Acessível</p>
-                                        <p className="text-xs text-zinc-500">1 crédito por uso</p>
+                                        <p className="text-xs text-zinc-500">5 créditos por uso</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
