@@ -1,19 +1,22 @@
+import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { NextRequest, NextResponse } from "next/server"
+import { ART_STYLES } from "@/lib/art-styles"
 import {
     handleRunPodError,
     validateEndpointConfig,
     logRunPodOperation,
+    parseRunPodOutput,
+    ensureBase64Prefix
 } from "@/lib/runpod-error-handler"
 
 export const dynamic = 'force-dynamic'
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY
-const RUNPOD_VIRTUAL_TRY_ON_ID = process.env.RUNPOD_VIRTUAL_TRY_ON_ID // Use .env value
+const RUNPOD_FLUX_ENDPOINT_ID = process.env.RUNPOD_FLUX_ENDPOINT_ID // FLUX model for image generation
 
-const CREDITS_COST = 20
+const CREDITS_COST = 35 // 25 (generation) + 10 (upscale)
 
 export async function POST(request: NextRequest) {
     const startTime = Date.now()
@@ -30,8 +33,8 @@ export async function POST(request: NextRequest) {
         // Validate endpoint configuration
         const configValidation = validateEndpointConfig({
             apiKey: RUNPOD_API_KEY,
-            endpointId: RUNPOD_VIRTUAL_TRY_ON_ID,
-            name: "Virtual Try-On"
+            endpointId: RUNPOD_FLUX_ENDPOINT_ID,
+            name: "Art Effects (FLUX)"
         })
 
         if (!configValidation.valid) {
@@ -43,83 +46,69 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { personImage, garmentImage, category } = body
+        const { image, styleId } = body
 
-        if (!personImage || !garmentImage) {
+        if (!image || !styleId) {
             return NextResponse.json(
-                { error: "Imagens são obrigatórias." },
+                { error: "Imagem e estilo são obrigatórios" },
                 { status: 400 }
             )
         }
 
-        // Validate category
-        const validCategories = ["upper_body", "lower_body", "dresses"]
-        if (!validCategories.includes(category)) {
+        // Validate style
+        const style = ART_STYLES.find(s => s.id === styleId)
+        if (!style) {
             return NextResponse.json(
-                { error: "Categoria inválida." },
+                { error: "Estilo inválido" },
                 { status: 400 }
             )
         }
 
-        // Check credits (but don't deduct yet - will deduct on successful completion)
+        // Validate image size (base64 string length check)
+        const cleanImage = image.replace(/^data:image\/[a-z]+;base64,/, "")
+        const imageSizeBytes = (cleanImage.length * 3) / 4 // Approximate base64 to bytes
+
+        if (imageSizeBytes > 10 * 1024 * 1024) { // 10MB limit
+            return NextResponse.json(
+                { error: "Imagem muito grande. Máximo 10MB." },
+                { status: 400 }
+            )
+        }
+
+        // Check credits (but don't deduct yet)
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: { credits: true },
         })
 
         if (!user || user.credits < CREDITS_COST) {
             return NextResponse.json(
-                { error: "Créditos insuficientes.", required: CREDITS_COST, available: user?.credits || 0 },
+                { error: `Créditos insuficientes. Você precisa de ${CREDITS_COST} créditos.` },
                 { status: 402 }
             )
         }
 
-        // Clean base64 images
-        const cleanPerson = personImage.includes(',') ? personImage.split(',')[1] : personImage
-        const cleanGarment = garmentImage.includes(',') ? garmentImage.split(',')[1] : garmentImage
-
-        // Validate image sizes
-        const personSizeBytes = (cleanPerson.length * 3) / 4
-        const garmentSizeBytes = (cleanGarment.length * 3) / 4
-        const maxSize = 10 * 1024 * 1024 // 10MB
-
-        if (personSizeBytes > maxSize || garmentSizeBytes > maxSize) {
-            return NextResponse.json(
-                { error: "Imagem muito grande. Máximo 10MB por imagem." },
-                { status: 400 }
-            )
-        }
-
-        // Map category for the model
-        const clothTypeMap: Record<string, string> = {
-            "upper_body": "upper_body",
-            "lower_body": "lower_body",
-            "dresses": "dresses"
-        }
-
-        const clothType = category === "upper_body" ? "shirt" :
-            category === "lower_body" ? "pants" : "dress"
-
         // Create job record in database
-        const tryOnJob = await prisma.virtualTryOn.create({
+        const artJob = await prisma.artEffect.create({
             data: {
                 userId: session.user.id,
-                personImageUrl: personImage.substring(0, 100) + "...",
-                garmentImageUrl: garmentImage.substring(0, 100) + "...",
-                category: category,
-                creditsUsed: CREDITS_COST,
+                inputImage: cleanImage.substring(0, 100) + "...", // Store truncated for space
+                styleId: styleId,
+                styleName: style.name,
                 status: "pending",
             },
         })
 
-        logRunPodOperation("virtual-try-on-start", {
-            endpoint: RUNPOD_VIRTUAL_TRY_ON_ID,
-            jobId: tryOnJob.id
+        logRunPodOperation("art-effects-start", {
+            endpoint: RUNPOD_FLUX_ENDPOINT_ID,
+            jobId: artJob.id
         })
 
-        // Call RunPod API (IDM-VTON)
+        // Build enhanced prompt with style
+        const enhancedPrompt = `${style.prompt}, high quality, detailed, professional, masterpiece`
+
+        // Call FLUX endpoint
         const runpodResponse = await fetch(
-            `https://api.runpod.ai/v2/${RUNPOD_VIRTUAL_TRY_ON_ID}/run`,
+            `https://api.runpod.ai/v2/${RUNPOD_FLUX_ENDPOINT_ID}/run`,
             {
                 method: "POST",
                 headers: {
@@ -128,12 +117,11 @@ export async function POST(request: NextRequest) {
                 },
                 body: JSON.stringify({
                     input: {
-                        reference_image: cleanPerson,
-                        cloth_image: cleanGarment,
-                        image_category: clothTypeMap[category] || "upper_body",
-                        cloth_type: clothType,
+                        prompt: enhancedPrompt,
+                        image: cleanImage,
+                        strength: 0.75, // How much to transform (0-1)
                         num_inference_steps: 30,
-                        guidance_scale: 7.5
+                        guidance_scale: 7.5,
                     },
                 }),
             }
@@ -147,18 +135,18 @@ export async function POST(request: NextRequest) {
             const errorResult = handleRunPodError(
                 runpodResponse.status,
                 errorBody,
-                "virtual-try-on"
+                "art-effects"
             )
 
-            logRunPodOperation("virtual-try-on-error", {
-                endpoint: RUNPOD_VIRTUAL_TRY_ON_ID,
+            logRunPodOperation("art-effects-error", {
+                endpoint: RUNPOD_FLUX_ENDPOINT_ID,
                 status: runpodResponse.status,
                 error: errorResult.message,
                 duration
             })
 
-            await prisma.virtualTryOn.update({
-                where: { id: tryOnJob.id },
+            await prisma.artEffect.update({
+                where: { id: artJob.id },
                 data: {
                     status: "failed",
                     errorMessage: errorResult.message
@@ -176,16 +164,16 @@ export async function POST(request: NextRequest) {
 
         const runpodData = await runpodResponse.json()
 
-        logRunPodOperation("virtual-try-on-submitted", {
-            endpoint: RUNPOD_VIRTUAL_TRY_ON_ID,
-            jobId: tryOnJob.id,
+        logRunPodOperation("art-effects-submitted", {
+            endpoint: RUNPOD_FLUX_ENDPOINT_ID,
+            jobId: artJob.id,
             status: runpodData.status,
             duration
         })
 
-        // Update with RunPod job ID
-        await prisma.virtualTryOn.update({
-            where: { id: tryOnJob.id },
+        // Update job with RunPod job ID
+        await prisma.artEffect.update({
+            where: { id: artJob.id },
             data: {
                 runpodJobId: runpodData.id,
                 status: "processing",
@@ -194,23 +182,22 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            jobId: tryOnJob.id,
+            jobId: artJob.id,
             runpodJobId: runpodData.id,
-            status: runpodData.status,
+            status: runpodData.status || "IN_QUEUE",
         })
 
     } catch (error) {
         const duration = Date.now() - startTime
 
-        logRunPodOperation("virtual-try-on-exception", {
+        logRunPodOperation("art-effects-exception", {
             error: error instanceof Error ? error.message : "Unknown error",
             duration
         })
 
         return NextResponse.json(
-            { error: "Erro ao processar. Tente novamente." },
+            { error: "Erro interno no servidor. Tente novamente." },
             { status: 500 }
         )
     }
 }
-

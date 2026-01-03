@@ -147,3 +147,62 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
     }
 }
+
+export async function DELETE(request: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions)
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
+        const { searchParams } = new URL(request.url)
+        const id = searchParams.get("id")
+        const type = searchParams.get("type")
+
+        if (!id || !type) {
+            return NextResponse.json({ error: "Missing parameters" }, { status: 400 })
+        }
+
+        let result;
+
+        switch (type) {
+            case "image-generation":
+                result = await prisma.imageGeneration.deleteMany({
+                    where: { id, userId: session.user.id }
+                })
+                break
+            case "upscale":
+                result = await prisma.imageUpscale.deleteMany({
+                    where: { id, userId: session.user.id }
+                })
+                break
+            case "face-swap":
+                result = await prisma.faceSwapJob.deleteMany({
+                    where: { id, userId: session.user.id }
+                })
+                break
+            case "inpaint":
+                result = await prisma.inpaint.deleteMany({
+                    where: { id, userId: session.user.id }
+                })
+                break
+            case "virtual-try-on":
+                result = await prisma.virtualTryOn.deleteMany({
+                    where: { id, userId: session.user.id }
+                })
+                break
+            default:
+                return NextResponse.json({ error: "Invalid type" }, { status: 400 })
+        }
+
+        if (result.count === 0) {
+            return NextResponse.json({ error: "Item not found or unauthorized" }, { status: 404 })
+        }
+
+        return NextResponse.json({ success: true })
+
+    } catch (error) {
+        console.error("Delete error:", error)
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+    }
+}

@@ -111,7 +111,7 @@ export default function VirtualTryOnPage() {
             const jobId = data.jobId
 
             // Polling
-            setProcessingStatus("Provando roupa com IA...")
+            setProcessingStatus("Enviando para fila de processamento...")
             const pollInterval = setInterval(async () => {
                 try {
                     const statusRes = await fetch(`/api/virtual-try-on/status/${jobId}`)
@@ -132,7 +132,16 @@ export default function VirtualTryOnPage() {
                         setProcessingStatus("")
                         setIsProcessing(false)
                     } else {
-                        setProcessingStatus(`Processando... ${statusData.status}`)
+                        // Traduzir status para português
+                        const statusMessages: Record<string, string> = {
+                            "IN_QUEUE": "Na fila de processamento... Aguarde",
+                            "IN_PROGRESS": "Processando com IA... Quase lá",
+                            "PROCESSING": "Aplicando roupa na foto...",
+                            "processing": "Aplicando roupa na foto...",
+                            "pending": "Inicializando processamento..."
+                        }
+                        const message = statusMessages[statusData.status] || `Processando... ${statusData.status}`
+                        setProcessingStatus(message)
                     }
                 } catch (e) {
                     console.error("Erro no polling:", e)
@@ -142,11 +151,11 @@ export default function VirtualTryOnPage() {
             setTimeout(() => {
                 clearInterval(pollInterval)
                 if (isProcessing) {
-                    setError("Tempo limite excedido. Tente novamente.")
+                    setError("Tempo limite excedido (5 min). O servidor pode estar sobrecarregado. Tente novamente em alguns minutos.")
                     setIsProcessing(false)
                     setProcessingStatus("")
                 }
-            }, 120000) // 2 min timeout
+            }, 300000) // 5 min timeout (aumentado de 2 min)
 
         } catch (e: unknown) {
             const errorMessage = e instanceof Error ? e.message : "Erro ao processar. Tente novamente."
@@ -217,8 +226,8 @@ export default function VirtualTryOnPage() {
                                 </label>
                                 <div
                                     className={`relative border-2 border-dashed rounded-2xl p-4 text-center transition-all h-64 flex flex-col items-center justify-center ${personImage
-                                            ? "border-indigo-500/50 bg-indigo-500/5"
-                                            : "border-zinc-700 hover:border-zinc-600"
+                                        ? "border-indigo-500/50 bg-indigo-500/5"
+                                        : "border-zinc-700 hover:border-zinc-600"
                                         }`}
                                 >
                                     <input
@@ -251,8 +260,8 @@ export default function VirtualTryOnPage() {
                                 </label>
                                 <div
                                     className={`relative border-2 border-dashed rounded-2xl p-4 text-center transition-all h-64 flex flex-col items-center justify-center ${garmentImage
-                                            ? "border-purple-500/50 bg-purple-500/5"
-                                            : "border-zinc-700 hover:border-zinc-600"
+                                        ? "border-purple-500/50 bg-purple-500/5"
+                                        : "border-zinc-700 hover:border-zinc-600"
                                         }`}
                                 >
                                     <input
@@ -281,8 +290,11 @@ export default function VirtualTryOnPage() {
                         {/* Category Selection */}
                         <div className="space-y-3">
                             <label className="text-sm font-medium text-zinc-300">
-                                Tipo de Roupa
+                                Tipo de Roupa <span className="text-red-400">*</span>
                             </label>
+                            <p className="text-xs text-zinc-400">
+                                ⚠️ Selecione apenas <strong className="text-zinc-200">UMA categoria</strong> por processamento
+                            </p>
                             <div className="grid grid-cols-3 gap-3">
                                 {CLOTH_TYPES.map((type) => (
                                     <button
@@ -290,8 +302,8 @@ export default function VirtualTryOnPage() {
                                         onClick={() => setCategory(type.id)}
                                         disabled={isProcessing}
                                         className={`p-3 rounded-xl border transition-all text-left ${category === type.id
-                                                ? "border-indigo-500 bg-indigo-500/20 shadow-lg shadow-indigo-500/10"
-                                                : "border-zinc-700 hover:border-zinc-500 bg-zinc-800/30"
+                                            ? "border-indigo-500 bg-indigo-500/20 shadow-lg shadow-indigo-500/10"
+                                            : "border-zinc-700 hover:border-zinc-500 bg-zinc-800/30"
                                             }`}
                                     >
                                         <p className="font-bold text-sm text-white">{type.label}</p>
@@ -392,9 +404,19 @@ export default function VirtualTryOnPage() {
                                     <ol className="text-sm text-zinc-400 space-y-2 list-decimal list-inside">
                                         <li>Envie sua foto de corpo inteiro ou meio corpo</li>
                                         <li>Envie a foto da roupa (pode ser foto de produto)</li>
-                                        <li>Selecione o tipo (parte de cima, baixo ou vestido)</li>
+                                        <li><strong className="text-zinc-200">Selecione o tipo de roupa</strong> (obrigatório)</li>
                                         <li>A IA veste a roupa em você realisticamente!</li>
                                     </ol>
+                                </div>
+
+                                {/* Important Note */}
+                                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-5">
+                                    <h3 className="font-semibold text-yellow-400 mb-3">⚠️ Importante</h3>
+                                    <ul className="text-sm text-zinc-300 space-y-2">
+                                        <li>• <strong>Uma peça por vez:</strong> O sistema processa apenas uma roupa por processamento</li>
+                                        <li>• <strong>Look completo?</strong> Faça 2 processamentos: primeiro a camiseta, depois use o resultado + calça</li>
+                                        <li>• <strong>Tipo obrigatório:</strong> A IA precisa saber se é parte superior, inferior ou vestido</li>
+                                    </ul>
                                 </div>
 
                                 {/* Tips */}
@@ -404,6 +426,7 @@ export default function VirtualTryOnPage() {
                                         <li>• Use fotos com boa iluminação</li>
                                         <li>• Evite poses muito complexas</li>
                                         <li>• A roupa deve estar visível e clara</li>
+                                        <li>• Para melhor resultado, use fundo neutro</li>
                                     </ul>
                                 </div>
                             </>

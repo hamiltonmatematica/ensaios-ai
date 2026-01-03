@@ -2,11 +2,17 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
+import {
+    logRunPodOperation,
+    parseRunPodOutput,
+    ensureBase64Prefix
+} from "@/lib/runpod-error-handler"
 
 export const dynamic = 'force-dynamic'
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY
-const RUNPOD_VIRTUAL_TRY_ON_ID = "a71bxqwgd57jzz"
+const RUNPOD_VIRTUAL_TRY_ON_ID = process.env.RUNPOD_VIRTUAL_TRY_ON_ID // Use .env value
+const CREDITS_COST = 20
 
 export async function GET(
     request: NextRequest,
@@ -77,7 +83,12 @@ export async function GET(
         )
 
         if (!runpodResponse.ok) {
-            console.error("Erro ao consultar status RunPod Try-On")
+            logRunPodOperation("virtual-try-on-status-error", {
+                endpoint: RUNPOD_VIRTUAL_TRY_ON_ID,
+                status: runpodResponse.status,
+                jobId: tryOnJob.id
+            })
+
             return NextResponse.json({
                 status: tryOnJob.status,
             })
@@ -86,50 +97,75 @@ export async function GET(
         const runpodData = await runpodResponse.json()
 
         if (runpodData.status === "COMPLETED") {
-            let resultUrl = null
+            // Parse output with multiple format support
+            const resultUrl = parseRunPodOutput(runpodData.output)
 
-            if (runpodData.output) {
-                if (runpodData.output.output_url) {
-                    resultUrl = runpodData.output.output_url
-                } else if (runpodData.output.image) {
-                    // Se vier base64
-                    resultUrl = `data:image/png;base64,${runpodData.output.image}`
-                } else if (typeof runpodData.output === "string" && runpodData.output.startsWith("http")) {
-                    resultUrl = runpodData.output
-                }
+            if (resultUrl) {
+                // Ensure base64 prefix if needed
+                const finalUrl = resultUrl.startsWith('http')
+                    ? resultUrl
+                    : ensureBase64Prefix(resultUrl)
+
+                // Update database
+                await prisma.virtualTryOn.update({
+                    where: { id: jobId },
+                    data: {
+                        status: "completed",
+                        resultUrl: finalUrl,
+                    },
+                })
+
+                // Deduct credits only on successful completion
+                await prisma.user.update({
+                    where: { id: session.user.id },
+                    data: { credits: { decrement: CREDITS_COST } },
+                })
+
+                logRunPodOperation("virtual-try-on-completed", {
+                    endpoint: RUNPOD_VIRTUAL_TRY_ON_ID,
+                    jobId: tryOnJob.id
+                })
+
+                return NextResponse.json({
+                    status: "COMPLETED",
+                    resultUrl: finalUrl,
+                })
+            } else {
+                // Completed but no valid output
+                await prisma.virtualTryOn.update({
+                    where: { id: jobId },
+                    data: {
+                        status: "failed",
+                        errorMessage: "Resultado inválido do processamento"
+                    },
+                })
+
+                return NextResponse.json({
+                    status: "FAILED",
+                    error: "Resultado inválido do processamento",
+                })
             }
 
-            // Atualizar banco
-            await prisma.virtualTryOn.update({
-                where: { id: jobId },
-                data: {
-                    status: "completed",
-                    resultUrl: resultUrl,
-                },
-            })
-
-            // Deduzir créditos
-            await prisma.user.update({
-                where: { id: session.user.id },
-                data: {
-                    credits: { decrement: tryOnJob.creditsUsed },
-                },
-            })
-
-            return NextResponse.json({
-                status: "COMPLETED",
-                resultUrl: resultUrl,
-            })
-
         } else if (runpodData.status === "FAILED") {
+            const errorMessage = runpodData.error || "Erro no provador virtual"
+
             await prisma.virtualTryOn.update({
                 where: { id: jobId },
-                data: { status: "failed" },
+                data: {
+                    status: "failed",
+                    errorMessage
+                },
+            })
+
+            logRunPodOperation("virtual-try-on-failed", {
+                endpoint: RUNPOD_VIRTUAL_TRY_ON_ID,
+                jobId: tryOnJob.id,
+                error: errorMessage
             })
 
             return NextResponse.json({
                 status: "FAILED",
-                error: runpodData.error || "Erro no provador virtual",
+                error: errorMessage,
             })
         }
 
@@ -138,9 +174,12 @@ export async function GET(
         })
 
     } catch (error) {
-        console.error("Erro ao verificar status try-on:", error)
+        logRunPodOperation("virtual-try-on-status-exception", {
+            error: error instanceof Error ? error.message : "Unknown error"
+        })
+
         return NextResponse.json(
-            { error: "Erro ao verificar status" },
+            { error: "Erro interno ao verificar status" },
             { status: 500 }
         )
     }

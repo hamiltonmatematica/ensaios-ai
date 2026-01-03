@@ -93,20 +93,43 @@ export async function POST(request: NextRequest) {
         console.log("RunPod Response Status:", runpodResponse.status)
 
         if (!runpodResponse.ok) {
-            const errorData = await runpodResponse.text()
-            console.error("Erro RunPod Status:", runpodResponse.status)
-            console.error("Erro RunPod Body:", errorData)
+            let errorMessage = "Erro ao conectar com serviço de processamento"
+            let errorData: any
+
+            try {
+                // Tenta fazer parse como JSON
+                const contentType = runpodResponse.headers.get("content-type")
+                if (contentType && contentType.includes("application/json")) {
+                    errorData = await runpodResponse.json()
+                    errorMessage = errorData.error || errorMessage
+                } else {
+                    // Se não for JSON, pega como texto
+                    errorData = await runpodResponse.text()
+                }
+
+                console.error("Erro RunPod Status:", runpodResponse.status)
+                console.error("Erro RunPod Body:", errorData)
+
+                // Identifica erro de tamanho de arquivo
+                if (typeof errorData === 'string' && errorData.includes("max body size")) {
+                    errorMessage = "Imagem muito grande. Tente com uma imagem menor."
+                } else if (errorData?.error?.includes("max body size")) {
+                    errorMessage = "Imagem muito grande. Tente com uma imagem menor."
+                }
+            } catch (parseError) {
+                console.error("Erro ao fazer parse da resposta:", parseError)
+            }
 
             await prisma.faceSwapJob.update({
                 where: { id: job.id },
                 data: {
                     status: "FAILED",
-                    errorMessage: "Erro ao conectar com serviço de processamento"
+                    errorMessage
                 },
             })
 
             return NextResponse.json(
-                { error: "Erro ao iniciar processamento." },
+                { error: errorMessage },
                 { status: 500 }
             )
         }

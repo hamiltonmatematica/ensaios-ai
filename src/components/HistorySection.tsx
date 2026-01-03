@@ -9,7 +9,8 @@ import {
     Shirt,
     Calendar,
     Download,
-    ExternalLink
+    ExternalLink,
+    Trash2
 } from "lucide-react"
 
 type HistoryItem = {
@@ -51,6 +52,22 @@ export default function HistorySection() {
             console.error("Failed to fetch history", error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleDelete = async (e: React.MouseEvent, id: string) => {
+        e.preventDefault()
+        if (!confirm("Tem certeza que deseja apagar este item do histórico?")) return
+
+        try {
+            const res = await fetch(`/api/user/history?id=${id}&type=${activeTab}`, {
+                method: "DELETE"
+            })
+            if (res.ok) {
+                setItems(prev => prev.filter(item => item.id !== id))
+            }
+        } catch (error) {
+            console.error("Error deleting item:", error)
         }
     }
 
@@ -128,6 +145,7 @@ export default function HistorySection() {
                                                 className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur-sm transition-colors"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
+                                                title="Baixar"
                                             >
                                                 <Download className="w-5 h-5" />
                                             </a>
@@ -136,9 +154,17 @@ export default function HistorySection() {
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur-sm transition-colors"
+                                                title="Abrir"
                                             >
                                                 <ExternalLink className="w-5 h-5" />
                                             </a>
+                                            <button
+                                                onClick={(e) => handleDelete(e, item.id)}
+                                                className="p-2 bg-red-500/20 hover:bg-red-500/40 rounded-full text-red-500 backdrop-blur-sm transition-colors"
+                                                title="Apagar"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -149,10 +175,10 @@ export default function HistorySection() {
                                             {new Date(item.createdAt).toLocaleDateString()}
                                         </span>
                                         <span className={`text-[10px] px-2 py-0.5 rounded-full border ${item.status === 'completed' || item.status === 'COMPLETED'
-                                                ? 'bg-green-500/10 text-green-500 border-green-500/20'
-                                                : item.status === 'failed' || item.status === 'FAILED'
-                                                    ? 'bg-red-500/10 text-red-500 border-red-500/20'
-                                                    : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                                            ? 'bg-green-500/10 text-green-500 border-green-500/20'
+                                            : item.status === 'failed' || item.status === 'FAILED'
+                                                ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                                                : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
                                             }`}>
                                             {item.status}
                                         </span>

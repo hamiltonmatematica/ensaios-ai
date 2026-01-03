@@ -12,13 +12,6 @@ export interface ToolConfig {
 }
 
 export const TOOL_CONFIG = {
-    GENERATE_IMAGE: {
-        slug: "generate-image",
-        name: "Gerar Imagem",
-        description: "Crie imagens HD com IA usando FLUX.1",
-        credits: 15,
-        endpoint: process.env.RUNPOD_FLUX_ENDPOINT_ID,
-    },
     AI_PHOTO: {
         slug: "ai-photo",
         name: "Ensaio de IA",
@@ -39,13 +32,6 @@ export const TOOL_CONFIG = {
         description: "Aumente resolução até 4x",
         credits: 10,
         endpoint: process.env.RUNPOD_UPSCALER_ID,
-    },
-    INPAINT: {
-        slug: "inpaint",
-        name: "Inpaint / Remover",
-        description: "Remova objetos de imagens",
-        credits: 15,
-        endpoint: process.env.RUNPOD_COMFYUI_ID,
     },
     VIRTUAL_TRYON: {
         slug: "virtual-tryon",

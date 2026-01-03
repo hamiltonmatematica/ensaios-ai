@@ -101,13 +101,49 @@ export default function FaceSwapPage() {
         })
     }
 
-    const fileToBase64 = (file: File): Promise<string> => {
+    const compressImage = (file: File, maxWidth: number = 1024, quality: number = 0.85): Promise<string> => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader()
             reader.readAsDataURL(file)
-            reader.onload = () => resolve(reader.result as string)
-            reader.onerror = (error) => reject(error)
+            reader.onload = (e) => {
+                const img = new Image()
+                img.onload = () => {
+                    // Calcula novas dimensões mantendo aspect ratio
+                    let width = img.width
+                    let height = img.height
+
+                    if (width > maxWidth) {
+                        height = (height * maxWidth) / width
+                        width = maxWidth
+                    }
+
+                    // Cria canvas para redimensionar
+                    const canvas = document.createElement('canvas')
+                    canvas.width = width
+                    canvas.height = height
+
+                    const ctx = canvas.getContext('2d')
+                    if (!ctx) {
+                        reject(new Error('Canvas context error'))
+                        return
+                    }
+
+                    ctx.drawImage(img, 0, 0, width, height)
+
+                    // Converte para base64 comprimido
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', quality)
+                    resolve(compressedBase64)
+                }
+                img.onerror = reject
+                img.src = e.target?.result as string
+            }
+            reader.onerror = reject
         })
+    }
+
+    const fileToBase64 = (file: File): Promise<string> => {
+        // Usa compressão para garantir que a imagem não exceda o limite
+        return compressImage(file, 1024, 0.85)
     }
 
     const handleSourceUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -300,10 +336,13 @@ export default function FaceSwapPage() {
                         Troque rostos entre imagens de forma rápida e realista usando inteligência artificial.
                         Custo: <span className="text-yellow-400 font-semibold">1 crédito</span>
                     </p>
-                    <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 max-w-xl mx-auto text-left">
+                    <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 max-w-xl mx-auto text-left space-y-2">
                         <p className="text-sm text-zinc-300">
                             💡 <strong>Dica:</strong> Para melhores resultados, use uma foto de rosto bem enquadrada (selfie frontal)
                             e uma foto alvo com o rosto visível e em boa resolução.
+                        </p>
+                        <p className="text-xs text-zinc-400">
+                            ⚡ As imagens são automaticamente comprimidas para otimizar o processamento.
                         </p>
                     </div>
                 </div>

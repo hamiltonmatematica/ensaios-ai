@@ -8,10 +8,7 @@ import {
     Sparkles,
     Coins,
     Loader2,
-    Wand2,
-    ImagePlus,
-    Eraser,
-    Shirt
+    ImagePlus
 } from "lucide-react"
 import DashboardCard from "@/components/DashboardCard"
 import Header from "@/components/Header"
@@ -92,16 +89,6 @@ export default function DashboardPage() {
                     </h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <DashboardCard
-                            title="Gerar Imagem"
-                            description="Crie imagens HD com IA usando FLUX.1"
-                            href="/generate-image"
-                            icon={Wand2}
-                            iconBgColor="bg-purple-500/20"
-                            iconColor="text-purple-400"
-                            credits={15}
-                            isNew
-                        />
-                        <DashboardCard
                             title="Ensaio de IA"
                             description="Ensaio profissional com suas fotos"
                             href="/ensaio"
@@ -129,23 +116,13 @@ export default function DashboardPage() {
                             isNew
                         />
                         <DashboardCard
-                            title="Inpaint / Remover"
-                            description="Remova objetos de imagens"
-                            href="/inpaint"
-                            icon={Eraser}
-                            iconBgColor="bg-rose-500/20"
-                            iconColor="text-rose-400"
-                            credits={15}
-                            isNew
-                        />
-                        <DashboardCard
-                            title="Provador Virtual"
-                            description="Prove roupas com IA"
-                            href="/virtual-try-on"
-                            icon={Shirt}
-                            iconBgColor="bg-indigo-500/20"
-                            iconColor="text-indigo-400"
-                            credits={20}
+                            title="Efeitos Artísticos"
+                            description="Transforme fotos em arte"
+                            href="/art-effects"
+                            icon={Sparkles}
+                            iconBgColor="bg-purple-500/20"
+                            iconColor="text-purple-400"
+                            credits={35}
                             isNew
                         />
                     </div>

@@ -1,0 +1,88 @@
+export const ART_STYLES = [
+    {
+        id: "watercolor",
+        name: "Aquarela",
+        description: "Efeito de pintura em aquarela suave",
+        prompt: "watercolor painting, soft colors, artistic, painted texture, delicate brush strokes",
+        icon: "🎨",
+    },
+    {
+        id: "oil_painting",
+        name: "Pintura a Óleo",
+        description: "Estilo clássico de pintura a óleo",
+        prompt: "oil painting, rich colors, textured canvas, classical art style, detailed brush strokes",
+        icon: "🖼️",
+    },
+    {
+        id: "anime",
+        name: "Anime",
+        description: "Estilo de anime japonês",
+        prompt: "anime style, manga art, vibrant colors, detailed eyes, clean lines, japanese animation",
+        icon: "🎌",
+    },
+    {
+        id: "cyberpunk",
+        name: "Cyberpunk",
+        description: "Futuro neon distópico",
+        prompt: "cyberpunk style, neon lights, futuristic, dark atmosphere, tech noir, blade runner aesthetic",
+        icon: "🌆",
+    },
+    {
+        id: "vintage",
+        name: "Vintage",
+        description: "Fotografia retrô anos 70/80",
+        prompt: "vintage photography, retro colors, film grain, 70s aesthetic, nostalgic, warm tones",
+        icon: "📷",
+    },
+    {
+        id: "cinematic",
+        name: "Cinematográfico",
+        description: "Qualidade de cinema profissional",
+        prompt: "cinematic lighting, movie quality, dramatic shadows, professional color grading, film look",
+        icon: "🎬",
+    },
+    {
+        id: "fantasy",
+        name: "Fantasia",
+        description: "Mundo mágico e místico",
+        prompt: "fantasy art, magical atmosphere, ethereal lighting, mystical, enchanted, dreamlike",
+        icon: "✨",
+    },
+    {
+        id: "pencil_sketch",
+        name: "Esboço a Lápis",
+        description: "Desenho artístico a grafite",
+        prompt: "pencil sketch, graphite drawing, artistic sketch, hand drawn, detailed shading",
+        icon: "✏️",
+    },
+    {
+        id: "pop_art",
+        name: "Pop Art",
+        description: "Estilo Andy Warhol colorido",
+        prompt: "pop art style, bold colors, high contrast, retro graphic design, andy warhol inspired",
+        icon: "🎭",
+    },
+    {
+        id: "cartoon_3d",
+        name: "Cartoon 3D",
+        description: "Animação 3D estilo Pixar",
+        prompt: "3d cartoon style, pixar quality, smooth rendering, vibrant colors, cute character design",
+        icon: "🎪",
+    },
+    {
+        id: "noir",
+        name: "Film Noir",
+        description: "Preto e branco dramático",
+        prompt: "film noir, black and white, dramatic lighting, high contrast, vintage detective aesthetic",
+        icon: "🎞️",
+    },
+    {
+        id: "impressionist",
+        name: "Impressionista",
+        description: "Estilo Monet/Van Gogh",
+        prompt: "impressionist painting, loose brush strokes, light and color emphasis, monet style, artistic",
+        icon: "🌻",
+    },
+] as const
+
+export type ArtStyle = typeof ART_STYLES[number]

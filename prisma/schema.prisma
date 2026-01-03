@@ -36,6 +36,7 @@ model User {
   avatarGenerations  AvatarGeneration[]
   virtualTryOns      VirtualTryOn[]
   transcriptions     Transcription[]
+  artEffects         ArtEffect[]
   
   // Credit System
   creditBalance       CreditBalance?
@@ -410,4 +411,22 @@ model CreditPurchaseHistory {
   
   @@index([userId])
   @@index([status])
+}
+
+// Efeitos Artísticos
+model ArtEffect {
+  id           String   @id @default(cuid())
+  userId       String
+  inputImage   String   @db.Text
+  styleId      String   // ID do estilo (watercolor, anime, etc)
+  styleName    String   // Nome do estilo para exibição
+  resultUrl    String?  @db.Text
+  status       String   @default("pending")
+  creditsUsed  Int      @default(35)
+  runpodJobId  String?
+  errorMessage String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
