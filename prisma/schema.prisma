@@ -13,7 +13,7 @@ model User {
   image         String?
   password      String?       // Para login com email/senha
   emailVerified DateTime?
-  credits       Int           @default(3) // 3 gerações gratuitas
+  credits       Int           @default(20) // 20 créditos iniciais
   creditsExpiresAt DateTime?  // Data de expiração dos créditos (90 dias)
   role          Role          @default(USER)
   createdAt     DateTime      @default(now())
