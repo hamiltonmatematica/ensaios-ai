@@ -33,18 +33,8 @@ export default function DashboardPage() {
     const [isPricingOpen, setIsPricingOpen] = useState(false)
     const [showLoginModal, setShowLoginModal] = useState(false)
 
-    // Calcular dias até expiração
-    const daysUntilExpiration = () => {
-        if (!session?.user?.creditsExpiresAt) return null
-        const expirationDate = new Date(session.user.creditsExpiresAt)
-        const now = new Date()
-        const diffTime = expirationDate.getTime() - now.getTime()
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-        return diffDays > 0 ? diffDays : 0
-    }
-
-    const expirationDays = daysUntilExpiration()
-    const showExpirationWarning = expirationDays !== null && expirationDays <= 7 && expirationDays > 0
+    // TODO: Implementar lógica de expiração de créditos
+    const showExpirationWarning = false
 
     // Redireciona para home se não estiver logado
     useEffect(() => {
@@ -117,7 +107,7 @@ export default function DashboardPage() {
                                 <div>
                                     <p className="text-sm font-semibold text-orange-400 mb-1">Créditos expirando</p>
                                     <p className="text-xs text-zinc-400">
-                                        Seus créditos expiram em <span className="font-bold text-white">{expirationDays} {expirationDays === 1 ? 'dia' : 'dias'}</span>
+                                        Seus créditos expiram em <span className="font-bold text-white">PLACEHOLDER</span>
                                     </p>
                                 </div>
                             </div>
