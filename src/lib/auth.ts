@@ -60,42 +60,66 @@ export const authOptions: NextAuthOptions = {
     },
     callbacks: {
         async signIn({ user, account }) {
-            if (!user.email) return false
+            try {
+                if (!user.email) return false
 
-            // Se for login via Google, cria ou atualiza usuário
-            if (account?.provider === "google") {
-                const existingUser = await prisma.user.findUnique({
-                    where: { email: user.email },
-                    include: { creditBalance: true }
-                })
+                // Se for login via Google, cria ou atualiza usuário
+                if (account?.provider === "google") {
+                    const existingUser = await prisma.user.findUnique({
+                        where: { email: user.email },
+                        include: { creditBalance: true }
+                    })
 
-                if (!existingUser) {
-                    // Cria novo usuário com 3 créditos gratuitos
-                    // Em V2, criamos também o CreditBalance
-                    await prisma.user.create({
-                        data: {
-                            email: user.email,
-                            name: user.name || "",
-                            image: user.image || "",
-                            credits: 3,
-                            creditBalance: {
-                                create: { totalCredits: 3 }
-                            }
+                    if (!existingUser) {
+                        // Cria novo usuário com 3 créditos gratuitos
+                        // Em V2, criamos também o CreditBalance
+                        try {
+                            await prisma.user.create({
+                                data: {
+                                    email: user.email,
+                                    name: user.name || "",
+                                    image: user.image || "",
+                                    credits: 3,
+                                    creditBalance: {
+                                        create: { totalCredits: 3 }
+                                    }
+                                }
+                            })
+                        } catch (createError) {
+                            console.error("Erro ao criar usuário (possível race condition):", createError)
+                            // Se falhar, tentamos recuperar o usuário que pode ter sido criado por outra requisição
+                            const recoveredUser = await prisma.user.findUnique({
+                                where: { email: user.email }
+                            })
+                            if (!recoveredUser) throw createError // Se realmente não existir, relança o erro
                         }
-                    })
-                } else if (!existingUser.creditBalance) {
-                    // FIX: Usuário existe mas não tem CreditBalance (criado antes de 03/01/2026)
-                    // Migra automaticamente do campo legado 'credits' para o novo sistema
-                    await prisma.creditBalance.create({
-                        data: {
-                            userId: existingUser.id,
-                            totalCredits: existingUser.credits
+                    } else {
+                        // FIX: Usuário existe mas não tem CreditBalance (criado antes de 03/01/2026)
+                        // Migra automaticamente do campo legado 'credits' para o novo sistema
+                        // Usamos upsert para evitar race conditions
+                        try {
+                            await prisma.creditBalance.upsert({
+                                where: { userId: existingUser.id },
+                                create: {
+                                    userId: existingUser.id,
+                                    totalCredits: existingUser.credits ?? 0
+                                },
+                                update: {
+                                    // Se já existe, não faz nada (mantém o saldo atual)
+                                }
+                            })
+                        } catch (upsertError) {
+                            console.error("Erro ao migrar CreditBalance:", upsertError)
+                            // Não bloqueia o login por erro na migração, apenas loga
                         }
-                    })
+                    }
                 }
-            }
 
-            return true
+                return true
+            } catch (error) {
+                console.error("Erro no callback signIn:", error)
+                return false // Retorna erro para o NextAuth redirecionar para página de erro
+            }
         },
         async jwt({ token, user }) {
             if (user) {
