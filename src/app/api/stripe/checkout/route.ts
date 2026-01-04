@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
                         currency: "brl",
                         product_data: {
                             name: selectedPackage.name,
-                            description: `${selectedPackage.images} gerações de imagens IA`,
+                            description: `${selectedPackage.credits} créditos (válidos por 90 dias)`,
                         },
                         unit_amount: selectedPackage.price, // Already in cents
                     },
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
             metadata: {
                 userId: session.user.id,
                 packageId: packageId,
-                credits: selectedPackage.images.toString()
+                credits: selectedPackage.credits.toString()
             },
             success_url: `${baseUrl}/my-photos?success=true`,
             cancel_url: `${baseUrl}/?canceled=true`,
