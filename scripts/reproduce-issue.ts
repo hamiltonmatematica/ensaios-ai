@@ -1,7 +1,5 @@
 
 import { PrismaClient } from '@prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
-import { Pool } from 'pg'
 import { config } from "dotenv"
 import { CreditService } from "../src/lib/credit-service"
 

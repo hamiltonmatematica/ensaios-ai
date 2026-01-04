@@ -1,7 +1,5 @@
 
 import { PrismaClient } from "@prisma/client"
-import { PrismaPg } from '@prisma/adapter-pg'
-import { Pool } from 'pg'
 import dotenv from 'dotenv'
 import path from 'path'
 
@@ -13,9 +11,7 @@ async function main() {
         throw new Error("DATABASE_URL not found")
     }
 
-    const pool = new Pool({ connectionString })
-    const adapter = new PrismaPg(pool)
-    const prisma = new PrismaClient({ adapter })
+    const prisma = new PrismaClient()
 
     try {
         const users = await prisma.user.findMany()

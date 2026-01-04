@@ -1,7 +1,5 @@
 
 import { PrismaClient } from "@prisma/client"
-import { PrismaPg } from '@prisma/adapter-pg'
-import { Pool } from 'pg'
 import dotenv from 'dotenv'
 import path from 'path'
 
@@ -14,9 +12,7 @@ async function main() {
     const connectionString = process.env.DATABASE_URL
     if (!connectionString) throw new Error("DATABASE_URL not found")
 
-    const pool = new Pool({ connectionString })
-    const adapter = new PrismaPg(pool)
-    const prisma = new PrismaClient({ adapter })
+    const prisma = new PrismaClient()
 
     try {
         // Create a test message directly in DB to verify schema/connection
