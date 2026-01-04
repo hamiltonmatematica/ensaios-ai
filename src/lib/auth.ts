@@ -65,7 +65,8 @@ export const authOptions: NextAuthOptions = {
             // Se for login via Google, cria ou atualiza usuário
             if (account?.provider === "google") {
                 const existingUser = await prisma.user.findUnique({
-                    where: { email: user.email }
+                    where: { email: user.email },
+                    include: { creditBalance: true }
                 })
 
                 if (!existingUser) {
@@ -80,6 +81,15 @@ export const authOptions: NextAuthOptions = {
                             creditBalance: {
                                 create: { totalCredits: 3 }
                             }
+                        }
+                    })
+                } else if (!existingUser.creditBalance) {
+                    // FIX: Usuário existe mas não tem CreditBalance (criado antes de 03/01/2026)
+                    // Migra automaticamente do campo legado 'credits' para o novo sistema
+                    await prisma.creditBalance.create({
+                        data: {
+                            userId: existingUser.id,
+                            totalCredits: existingUser.credits
                         }
                     })
                 }
