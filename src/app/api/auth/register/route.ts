@@ -45,7 +45,12 @@ export async function POST(req: Request) {
                 email,
                 password: hashedPassword,
                 name: email.split("@")[0],
-                credits: 3, // 3 créditos grátis
+                credits: 3, // 3 créditos grátis (mantido para compatibilidade)
+                creditBalance: {
+                    create: {
+                        totalCredits: 3 // Novo sistema de créditos
+                    }
+                }
             },
         })
 
