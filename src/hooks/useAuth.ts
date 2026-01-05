@@ -47,7 +47,8 @@ export function useAuth(redirectTo?: string): UseAuthReturn {
                     name: data.user.name,
                     credits: data.user.credits
                 })
-                setCredits(data.user.credits || 0)
+                // Não setar credits aqui para não sobrescrever o valor atualizado do check-balance
+                // setCredits(data.user.credits || 0)
             }
         } catch (error) {
             console.error('Error fetching user data:', error)
