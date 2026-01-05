@@ -36,7 +36,13 @@ export async function GET() {
             )
         }
 
-        return NextResponse.json({ user })
+        // Se não tiver nome no banco, tenta pegar do metadata do Supabase
+        const finalUser = {
+            ...user,
+            name: user.name || supabaseUser.user_metadata?.name || null
+        }
+
+        return NextResponse.json({ user: finalUser })
     } catch (error) {
         console.error("Erro ao buscar usuário:", error)
         return NextResponse.json(
