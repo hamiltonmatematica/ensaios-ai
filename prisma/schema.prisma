@@ -23,6 +23,7 @@ model User {
   
   accounts      Account[]
   sessions      Session[]
+  userSessions  UserSession[] // ✅ Sessões de controle de dispositivos (ap_user_sessions)
   generations   Generation[]      // ✅ Ensaio de IA
   transactions  Transaction[]
   supportMessages SupportMessage[]
