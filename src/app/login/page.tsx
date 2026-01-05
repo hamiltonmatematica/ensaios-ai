@@ -153,7 +153,28 @@ export default function LoginPage() {
                     </div>
                 )}
 
-                {isSignup ? (
+                {/* Se cadastro foi sucesso, mostra só mensagem e botão de login */}
+                {isSignup && message?.type === "success" ? (
+                    <div className="space-y-6">
+                        <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto">
+                            <Mail className="w-8 h-8 text-green-500" />
+                        </div>
+                        <h2 className="text-xl font-bold text-center text-white">Verifique seu email</h2>
+                        <p className="text-zinc-400 text-center text-sm">
+                            Enviamos um link de confirmação para <strong>{email}</strong>.
+                            Clique no link para ativar sua conta.
+                        </p>
+                        <button
+                            onClick={() => {
+                                setIsSignup(false)
+                                setMessage(null)
+                            }}
+                            className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-lg transition-colors"
+                        >
+                            Voltar para o Login
+                        </button>
+                    </div>
+                ) : isSignup ? (
                     // FORMULÁRIO DE CADASTRO
                     <form onSubmit={handleSignup} className="space-y-4">
                         <div>
