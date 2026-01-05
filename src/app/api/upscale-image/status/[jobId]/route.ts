@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server"
 export const dynamic = 'force-dynamic'
 
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY
-const RUNPOD_UPSCALE_ENDPOINT_ID = process.env.RUNPOD_UPSCALE_ENDPOINT_ID || "eyoku6bop62rtq"
+const RUNPOD_UPSCALE_ENDPOINT_ID = process.env.RUNPOD_UPSCALE_ENDPOINT_ID || "qqx0my03hxzi5k"
 
 export async function GET(
     request: NextRequest,
@@ -82,9 +82,11 @@ export async function GET(
         )
 
         if (!runpodResponse.ok) {
-            console.error("Erro ao consultar status RunPod Upscaler")
+            const errorText = await runpodResponse.text()
+            console.error(`Erro ao consultar status RunPod Upscaler: ${runpodResponse.status} ${runpodResponse.statusText} - Body: ${errorText}`)
             return NextResponse.json({
                 status: upscaleJob.status,
+                error: `RunPod Error: ${runpodResponse.status}`,
             })
         }
 
