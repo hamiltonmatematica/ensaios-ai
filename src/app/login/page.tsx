@@ -17,10 +17,39 @@ export default function LoginPage() {
     const router = useRouter()
     const supabase = createClient()
 
+    const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
+
+    const handleResendConfirmation = async () => {
+        if (!unverifiedEmail) return
+
+        try {
+            setIsLoading(true)
+            const { error } = await supabase.auth.resend({
+                type: 'signup',
+                email: unverifiedEmail,
+                options: {
+                    emailRedirectTo: `${window.location.origin}/auth/callback`
+                }
+            })
+
+            if (error) {
+                setMessage({ type: "error", text: error.message })
+            } else {
+                setMessage({ type: "success", text: "Email de confirmação reenviado! Verifique sua caixa de entrada." })
+                setUnverifiedEmail(null)
+            }
+        } catch (error) {
+            setMessage({ type: "error", text: "Erro ao reenviar email." })
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     const handleEmailLogin = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsLoading(true)
         setMessage(null)
+        setUnverifiedEmail(null)
 
         try {
             const { data, error } = await supabase.auth.signInWithPassword({
@@ -32,6 +61,7 @@ export default function LoginPage() {
                 setMessage({ type: "error", text: "Email ou senha incorretos." })
             } else if (data.user && !data.user.email_confirmed_at) {
                 await supabase.auth.signOut()
+                setUnverifiedEmail(email)
                 setMessage({
                     type: "error",
                     text: "Por favor, confirme seu email antes de fazer login."
@@ -156,6 +186,14 @@ export default function LoginPage() {
                             }`}
                     >
                         {message.text}
+                        {unverifiedEmail && message.type === "error" && (
+                            <button
+                                onClick={handleResendConfirmation}
+                                className="block mt-2 text-xs font-bold underline hover:opacity-80"
+                            >
+                                Reenviar email de confirmação
+                            </button>
+                        )}
                     </div>
                 )}
 
