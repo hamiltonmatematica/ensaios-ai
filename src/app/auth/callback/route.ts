@@ -14,6 +14,26 @@ export async function GET(request: Request) {
         const { error } = await supabase.auth.exchangeCodeForSession(code)
 
         if (!error) {
+            // Inicializar créditos se necessário (PKCE)
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) {
+                try {
+                    const prisma = (await import("@/lib/prisma")).default
+                    const balance = await prisma.creditBalance.findUnique({ where: { userId: user.id } })
+
+                    if (!balance) {
+                        await prisma.creditBalance.create({
+                            data: {
+                                userId: user.id,
+                                totalCredits: 20
+                            }
+                        })
+                    }
+                } catch (err) {
+                    console.error("Erro ao inicializar créditos:", err)
+                }
+            }
+
             return NextResponse.redirect(new URL(next, request.url))
         } else {
             const errorMsg = error.message || 'Erro ao trocar código por sessão'
@@ -32,6 +52,26 @@ export async function GET(request: Request) {
             })
 
             if (!error) {
+                // Inicializar créditos se necessário (OTP)
+                const { data: { user } } = await supabase.auth.getUser()
+                if (user) {
+                    try {
+                        const prisma = (await import("@/lib/prisma")).default
+                        const balance = await prisma.creditBalance.findUnique({ where: { userId: user.id } })
+
+                        if (!balance) {
+                            await prisma.creditBalance.create({
+                                data: {
+                                    userId: user.id,
+                                    totalCredits: 20
+                                }
+                            })
+                        }
+                    } catch (err) {
+                        console.error("Erro ao inicializar créditos (OTP):", err)
+                    }
+                }
+
                 // Redirecionar baseado no tipo
                 if (type === 'recovery') {
                     // verifyOtp já criou a sessão, só redireciona
