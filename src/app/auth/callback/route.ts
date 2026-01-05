@@ -35,5 +35,7 @@ export async function GET(request: Request) {
     }
 
     // Se houver erro ou não houver token, redireciona para login
-    return NextResponse.redirect(new URL('/login', request.url))
+    // Se houver erro ou não houver token, redireciona para login com detalhes
+    const errorMsg = requestUrl.searchParams.get('error_description') || 'Falha na verificação'
+    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(errorMsg)}`, request.url))
 }
