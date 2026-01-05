@@ -21,6 +21,32 @@ export async function POST(request: Request) {
     try {
         switch (action) {
             case 'create': {
+                // Verificar se o usuário existe na tabela public.User
+                // Isso corrige o erro de FK se o trigger de sync falhar ou não existir
+                let dbUser = await prisma.user.findUnique({ where: { id: user.id } })
+
+                if (!dbUser) {
+                    try {
+                        console.log(`[Session] User record missing for ${user.id}. Creating fallback...`)
+                        dbUser = await prisma.user.create({
+                            data: {
+                                id: user.id,
+                                email: user.email!, // Supabase Auth user always has email
+                                name: user.user_metadata?.name || user.email?.split('@')[0],
+                                credits: 20, // Default 20 for new users created via fallback
+                            }
+                        })
+
+                        // Também criar CreditBalance se for criação fallback
+                        await prisma.creditBalance.create({
+                            data: { userId: user.id, totalCredits: 20 }
+                        })
+                    } catch (err) {
+                        console.error("[Session] Error creating fallback user:", err)
+                        // Se falhar (ex: race condition), tentamos prosseguir
+                    }
+                }
+
                 // Verifica quantas sessões ativas o usuário tem
                 const sessions = await prisma.userSession.findMany({
                     where: {
