@@ -54,9 +54,9 @@ export default function UpscaleImagePage() {
                     let width = img.width
                     let height = img.height
 
-                    // Limite máximo seguro para garantir que upscale 4x caiba na VRAM (24GB)
-                    // 2048 * 4 = 8192px (8k resolução final)
-                    const MAX_DIMENSION = 2048
+                    // Limite reduzido para evitar CUDA Out of Memory (9GB alloc / 24GB total)
+                    // 1500 * 4 = 6000px (6k resolução final) - Muito mais seguro
+                    const MAX_DIMENSION = 1500
 
                     if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
                         if (width > height) {
