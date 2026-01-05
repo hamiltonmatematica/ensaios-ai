@@ -18,7 +18,7 @@ export async function GET(request: Request) {
             const { data: { user } } = await supabase.auth.getUser()
             if (user) {
                 try {
-                    const prisma = (await import("@/lib/prisma")).default
+                    const prisma = (await import("@/lib/prisma")).prisma
                     const balance = await prisma.creditBalance.findUnique({ where: { userId: user.id } })
 
                     if (!balance) {
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
                 const { data: { user } } = await supabase.auth.getUser()
                 if (user) {
                     try {
-                        const prisma = (await import("@/lib/prisma")).default
+                        const prisma = (await import("@/lib/prisma")).prisma
                         const balance = await prisma.creditBalance.findUnique({ where: { userId: user.id } })
 
                         if (!balance) {
