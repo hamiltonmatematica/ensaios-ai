@@ -57,6 +57,10 @@ export default function LoginPage() {
                 password,
             })
 
+            if (process.env.NODE_ENV === 'development') {
+                console.log("[Login Debug]", { user: data.user, session: data.session, error })
+            }
+
             if (error) {
                 setMessage({ type: "error", text: "Email ou senha incorretos." })
             } else if (data.user && !data.user.email_confirmed_at) {
@@ -124,22 +128,35 @@ export default function LoginPage() {
         setIsLoading(true)
         setMessage(null)
 
-        if (password !== confirmPassword) {
-            setMessage({ type: "error", text: "As senhas não coincidem." })
-            setIsLoading(false)
-            return
+        if (!isSignup) {
+            if (password !== confirmPassword) {
+                setMessage({ type: "error", text: "As senhas não coincidem." })
+                setIsLoading(false)
+                return
+            }
         }
 
-        if (password.length < 6) {
-            setMessage({ type: "error", text: "A senha deve ter pelo menos 6 caracteres." })
-            setIsLoading(false)
-            return
+        if (isSignup) {
+            // Em cadastro sem senha, não validamos senha aqui
+        } else {
+            // Login normal valida a senha
+            if (password.length < 6) {
+                setMessage({ type: "error", text: "A senha deve ter pelo menos 6 caracteres." })
+                setIsLoading(false)
+                return
+            }
         }
 
         try {
+            // Gera uma senha temporária segura para o cadastro inicial
+            // O usuário vai definir a senha real na tela de confirmação de email
+            const signupPassword = isSignup
+                ? `Temp${Math.random().toString(36).slice(-8)}!${Date.now()}`
+                : password
+
             const { data, error } = await supabase.auth.signUp({
                 email,
-                password,
+                password: signupPassword,
                 options: {
                     data: { name: name || email.split('@')[0] },
                     emailRedirectTo: `${window.location.origin}/auth/callback`,
@@ -248,35 +265,7 @@ export default function LoginPage() {
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-zinc-400 mb-1">
-                                Senha
-                            </label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-yellow-500"
-                                placeholder="Mínimo 6 caracteres"
-                                required
-                                minLength={6}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-zinc-400 mb-1">
-                                Confirmar Senha
-                            </label>
-                            <input
-                                type="password"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-yellow-500"
-                                placeholder="Repita a senha"
-                                required
-                                minLength={6}
-                            />
-                        </div>
+                        {/* Senha será definida na confirmação do email */}
 
                         <button
                             type="submit"
