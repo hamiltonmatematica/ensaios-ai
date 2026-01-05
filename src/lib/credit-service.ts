@@ -25,10 +25,10 @@ export class CreditService {
         console.log(`[CreditService] getBalance for ${userId}:`, balance) // DEBUG LOG
 
         if (!balance) {
-            console.log(`[CreditService] Creating empty balance for ${userId}`) // DEBUG LOG
-            // Se ainda assim não existir, cria zerado
+            console.log(`[CreditService] Creating initial balance (20) for ${userId}`) // DEBUG LOG
+            // Cria com 20 créditos iniciais (bônus de cadastro)
             return await prisma.creditBalance.create({
-                data: { userId, totalCredits: 0 }
+                data: { userId, totalCredits: 20 }
             })
         }
 
