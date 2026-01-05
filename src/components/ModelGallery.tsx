@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/hooks/useAuth"
 import { Lock } from "lucide-react"
 import { PhotoModel } from "@/types"
 
@@ -22,14 +22,14 @@ interface ModelGalleryProps {
 }
 
 export default function ModelGallery({ selectedModelId, onSelectModel }: ModelGalleryProps) {
-    const { data: session } = useSession()
+    const { credits } = useAuth()
     const [models, setModels] = useState<ModelWithTags[]>([])
     const [allTags, setAllTags] = useState<Tag[]>([])
     const [selectedTags, setSelectedTags] = useState<string[]>([])
     const [loading, setLoading] = useState(true)
 
     // Usuário tem créditos = pode acessar modelos premium
-    const hasCredits = (session?.user?.credits ?? 0) > 0
+    const hasCredits = (credits ?? 0) > 0
 
     useEffect(() => {
         async function fetchModels() {

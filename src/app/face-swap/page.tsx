@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef, useEffect } from "react"
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/hooks/useAuth"
 import { useRouter } from "next/navigation"
 import {
     Upload,
@@ -22,7 +22,7 @@ import {
 } from "lucide-react"
 import Header from "@/components/Header"
 import PricingModal from "@/components/PricingModal"
-import LoginModal from "@/components/LoginModal"
+
 
 interface FaceSwapResult {
     id: string
@@ -31,7 +31,7 @@ interface FaceSwapResult {
 }
 
 export default function FaceSwapPage() {
-    const { data: session, status, update: updateSession } = useSession()
+    const { user, loading, credits, refreshCredits } = useAuth("/login")
     const router = useRouter()
 
     // State
@@ -44,33 +44,28 @@ export default function FaceSwapPage() {
     const [error, setError] = useState<string | null>(null)
     const [processingStatus, setProcessingStatus] = useState<string>("")
     const [isPricingOpen, setIsPricingOpen] = useState(false)
-    const [showLoginModal, setShowLoginModal] = useState(false)
+
     const [showHowItWorks, setShowHowItWorks] = useState(false)
     const [history, setHistory] = useState<FaceSwapResult[]>([])
 
     const sourceInputRef = useRef<HTMLInputElement>(null)
     const targetInputRef = useRef<HTMLInputElement>(null)
 
-    // Redireciona para home se não estiver logado
-    useEffect(() => {
-        if (status === "unauthenticated") {
-            router.push("/")
-        }
-    }, [status, router])
-
     // Carrega histórico
     useEffect(() => {
-        if (session) {
+        if (user) {
             fetchHistory()
         }
-    }, [session])
+    }, [user])
 
     const fetchHistory = async () => {
         try {
             const res = await fetch("/api/face-swap/history")
             if (res.ok) {
                 const data = await res.json()
-                setHistory(data.jobs || [])
+                // API agora retorna array direto ou objeto com jobs (retrocompatibilidade)
+                const jobs = Array.isArray(data) ? data : (data.jobs || [])
+                setHistory(jobs)
             }
         } catch (e) {
             console.error("Erro ao carregar histórico:", e)
@@ -192,8 +187,8 @@ export default function FaceSwapPage() {
         setError(null)
 
         // Validações
-        if (!session?.user) {
-            setShowLoginModal(true)
+        if (!user) {
+            router.push("/login")
             return
         }
 
@@ -202,13 +197,13 @@ export default function FaceSwapPage() {
             return
         }
 
-        if ((session.user.credits ?? 0) < 5) {
+        if ((credits ?? 0) < 5) {
             setIsPricingOpen(true)
             return
         }
 
         setIsProcessing(true)
-        setProcessingStatus("Iniciando processamento...")
+        setProcessingStatus("Preparando sua transformação...")
 
         try {
             // Chama API
@@ -230,45 +225,82 @@ export default function FaceSwapPage() {
             const jobId = data.jobId
 
             // Polling para status
-            setProcessingStatus("Processando com IA...")
+            setProcessingStatus("Criando sua imagem com IA...")
             const pollInterval = setInterval(async () => {
                 try {
                     const statusRes = await fetch(`/api/face-swap/status/${jobId}`)
                     const statusData = await statusRes.json()
+                    console.log("[Face Swap Client] Status response:", statusData)
 
                     if (statusData.status === "COMPLETED") {
+                        console.log("[Face Swap Client] Job completed!")
                         clearInterval(pollInterval)
-                        setResult({
-                            id: jobId,
-                            resultImage: statusData.resultImage,
-                            createdAt: new Date(),
-                        })
                         setProcessingStatus("")
                         setIsProcessing(false)
-                        await updateSession()
-                        fetchHistory()
+
+                        // Atualizar histórico primeiro
+                        await fetchHistory()
+
+                        // Buscar o job do banco para garantir que temos os dados corretos
+                        try {
+                            const jobRes = await fetch(`/api/face-swap/history`)
+                            const jobs = await jobRes.json()
+                            const completedJob = jobs.find((j: any) => j.id === jobId)
+
+                            if (completedJob) {
+                                console.log("[Face Swap Client] Setting result from history:", completedJob)
+                                setResult(completedJob)
+                            } else {
+                                console.log("[Face Swap Client] Job not found in history yet, using status data")
+                                setResult({
+                                    id: jobId,
+                                    resultImage: statusData.resultImage,
+                                    createdAt: new Date(),
+                                })
+                            }
+
+                            // Scroll para o resultado
+                            setTimeout(() => {
+                                const resultElement = document.getElementById("result-section")
+                                if (resultElement) {
+                                    resultElement.scrollIntoView({ behavior: "smooth", block: "start" })
+                                }
+                            }, 100)
+                        } catch (error) {
+                            console.error("[Face Swap Client] Error fetching completed job:", error)
+                            // Fallback em caso de erro no fetch
+                            setResult({
+                                id: jobId,
+                                resultImage: statusData.resultImage,
+                                createdAt: new Date(),
+                            })
+                        }
+
+                        await refreshCredits()
                     } else if (statusData.status === "FAILED") {
+                        console.log("[Face Swap Client] Job failed:", statusData.error)
                         clearInterval(pollInterval)
                         setError(statusData.error || "Erro ao processar. Tente novamente.")
                         setProcessingStatus("")
                         setIsProcessing(false)
                     } else {
-                        setProcessingStatus(`Processando... ${statusData.status}`)
+                        console.log("[Face Swap Client] Still processing, status:", statusData.status)
+                        setProcessingStatus("Aplicando transformação...")
                     }
                 } catch (e) {
                     console.error("Erro no polling:", e)
                 }
             }, 2000)
 
-            // Timeout de 120 segundos
+            // Timeout de 180 segundos (3 minutos)
             setTimeout(() => {
                 clearInterval(pollInterval)
                 if (isProcessing) {
-                    setError("Tempo limite excedido. Tente novamente.")
+                    setError("Tempo limite excedido. O Face Swap pode levar alguns minutos. Verifique o histórico em alguns instantes.")
                     setIsProcessing(false)
                     setProcessingStatus("")
                 }
-            }, 120000)
+            }, 180000)
 
         } catch (e: unknown) {
             const errorMessage = e instanceof Error ? e.message : "Erro ao processar. Tente novamente."
@@ -278,13 +310,26 @@ export default function FaceSwapPage() {
         }
     }
 
-    const handleDownload = () => {
+    const handleDownload = async () => {
         if (!result?.resultImage) return
 
-        const link = document.createElement("a")
-        link.href = result.resultImage
-        link.download = `face-swap-${result.id}.png`
-        link.click()
+        try {
+            // Se for URL do proxy, buscar a imagem
+            const response = await fetch(result.resultImage)
+            const blob = await response.blob()
+            const url = URL.createObjectURL(blob)
+
+            const link = document.createElement("a")
+            link.href = url
+            link.download = `face-swap-${result.id}.png`
+            link.click()
+
+            // Limpar URL temporária
+            setTimeout(() => URL.revokeObjectURL(url), 100)
+        } catch (error) {
+            console.error("Erro ao fazer download:", error)
+            alert("Erro ao fazer download. Tente novamente.")
+        }
     }
 
     const handleShare = async () => {
@@ -298,7 +343,7 @@ export default function FaceSwapPage() {
         }
     }
 
-    if (status === "loading") {
+    if (loading) {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
@@ -306,7 +351,7 @@ export default function FaceSwapPage() {
         )
     }
 
-    if (!session) {
+    if (!user) {
         return null
     }
 
@@ -314,7 +359,7 @@ export default function FaceSwapPage() {
         <div className="min-h-screen bg-zinc-950 flex flex-col font-sans text-zinc-100">
             <Header
                 onOpenPricing={() => setIsPricingOpen(true)}
-                onOpenLogin={() => setShowLoginModal(true)}
+                onOpenLogin={() => router.push("/login")}
             />
 
             <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl">
@@ -507,16 +552,21 @@ export default function FaceSwapPage() {
 
                         {/* Result Section */}
                         {result && (
-                            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
+                            <div id="result-section" className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
                                 <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                                     <CheckCircle className="w-5 h-5 text-green-500" />
                                     Resultado
                                 </h3>
                                 <div className="rounded-xl overflow-hidden bg-black">
                                     <img
+                                        key={result.id}
                                         src={result.resultImage}
                                         alt="Result"
                                         className="w-full h-auto max-h-[500px] object-contain"
+                                        onError={(e) => {
+                                            console.error("Erro ao carregar imagem:", result.resultImage)
+                                            e.currentTarget.src = result.resultImage + "?retry=" + Date.now()
+                                        }}
                                     />
                                 </div>
                                 <div className="flex flex-wrap gap-3">
@@ -555,7 +605,7 @@ export default function FaceSwapPage() {
                                 <span className="font-semibold text-white">Seus Créditos</span>
                             </div>
                             <p className="text-3xl font-bold text-white mb-3">
-                                {session.user?.credits ?? 0}
+                                {credits ?? 0}
                             </p>
                             <button
                                 onClick={() => setIsPricingOpen(true)}
@@ -672,10 +722,7 @@ export default function FaceSwapPage() {
                 onClose={() => setIsPricingOpen(false)}
             />
 
-            <LoginModal
-                isOpen={showLoginModal}
-                onClose={() => setShowLoginModal(false)}
-            />
+
         </div>
     )
 }

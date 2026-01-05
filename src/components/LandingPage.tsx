@@ -1,8 +1,7 @@
 "use client"
 
-import { useSession, signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import {
     Camera,
     Sparkles,
@@ -16,7 +15,6 @@ import {
 } from "lucide-react"
 import Header from "@/components/Header"
 import PricingModal from "@/components/PricingModal"
-import LoginModal from "@/components/LoginModal"
 
 const features = [
     {
@@ -51,36 +49,14 @@ const portfolioImages = [
 ]
 
 export default function LandingPage() {
-    const { data: session, status } = useSession()
     const router = useRouter()
     const [isPricingOpen, setIsPricingOpen] = useState(false)
-    const [showLoginModal, setShowLoginModal] = useState(false)
-
-    // Redireciona para dashboard se já estiver logado
-    useEffect(() => {
-        if (status === "authenticated" && session) {
-            router.push("/dashboard")
-        }
-    }, [status, session, router])
-
-    if (status === "loading") {
-        return (
-            <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-        )
-    }
-
-    // Se já estiver logado, não renderiza (vai redirecionar)
-    if (session) {
-        return null
-    }
 
     return (
         <div className="min-h-screen bg-zinc-950 flex flex-col font-sans text-zinc-100">
             <Header
                 onOpenPricing={() => setIsPricingOpen(true)}
-                onOpenLogin={() => setShowLoginModal(true)}
+                onOpenLogin={() => router.push('/login')}
             />
 
             {/* Hero Section */}
@@ -114,7 +90,7 @@ export default function LandingPage() {
                         {/* CTA Buttons */}
                         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                             <button
-                                onClick={() => setShowLoginModal(true)}
+                                onClick={() => router.push('/login')}
                                 className="group w-full sm:w-auto bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-zinc-900 px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 flex items-center justify-center gap-2"
                             >
                                 Comece Grátis
@@ -166,7 +142,7 @@ export default function LandingPage() {
                                 <h3 className="text-2xl font-bold text-white mb-3">{feature.title}</h3>
                                 <p className="text-zinc-400 mb-6 leading-relaxed">{feature.description}</p>
                                 <button
-                                    onClick={() => setShowLoginModal(true)}
+                                    onClick={() => router.push('/login')}
                                     className="flex items-center gap-2 text-yellow-500 hover:text-yellow-400 font-medium transition-colors group"
                                 >
                                     Experimentar agora
@@ -226,7 +202,7 @@ export default function LandingPage() {
 
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
                             <button
-                                onClick={() => setShowLoginModal(true)}
+                                onClick={() => router.push('/login')}
                                 className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-zinc-900 px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-lg shadow-yellow-500/25"
                             >
                                 Criar Conta Grátis
@@ -265,11 +241,6 @@ export default function LandingPage() {
             <PricingModal
                 isOpen={isPricingOpen}
                 onClose={() => setIsPricingOpen(false)}
-            />
-
-            <LoginModal
-                isOpen={showLoginModal}
-                onClose={() => setShowLoginModal(false)}
             />
         </div>
     )

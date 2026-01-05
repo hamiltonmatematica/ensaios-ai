@@ -1,26 +1,32 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { createClient } from "@/lib/supabase-server"
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 
-// Evita pre-rendering durante build
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
     try {
-        // Verifica autenticação
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return NextResponse.json(
-                { error: "Você precisa estar logado." },
-                { status: 401 }
-            )
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+        if (authError || !user?.email) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
+        // Busca usuário no Prisma
+        const dbUser = await prisma.user.findUnique({
+            where: { email: user.email },
+            select: { id: true }
+        })
+
+        if (!dbUser) {
+            return NextResponse.json({ error: "User not found" }, { status: 404 })
         }
 
         // Busca últimos 10 jobs completados do usuário
         const jobs = await prisma.faceSwapJob.findMany({
             where: {
-                userId: session.user.id,
+                userId: dbUser.id,
                 status: "COMPLETED",
             },
             orderBy: {
@@ -29,20 +35,20 @@ export async function GET() {
             take: 10,
             select: {
                 id: true,
-                resultImage: true,
                 createdAt: true,
             },
         })
 
-        return NextResponse.json({
-            jobs,
-        })
+        const jobsWithUrl = jobs.map(job => ({
+            id: job.id,
+            resultImage: `/api/face-swap/image/${job.id}`,
+            createdAt: job.createdAt
+        }))
+
+        return NextResponse.json(jobsWithUrl)
 
     } catch (error) {
         console.error("Erro ao buscar histórico:", error)
-        return NextResponse.json(
-            { error: "Erro ao buscar histórico." },
-            { status: 500 }
-        )
+        return NextResponse.json({ error: "Erro ao buscar histórico." }, { status: 500 })
     }
 }

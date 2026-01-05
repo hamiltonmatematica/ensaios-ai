@@ -1,5 +1,4 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { createClient } from "@/lib/supabase-server"
 import { prisma } from "@/lib/prisma"
 import { CreditService } from "@/lib/credit-service"
 import { NextRequest, NextResponse } from "next/server"
@@ -14,12 +13,27 @@ const COST_CREDITS = 5
 
 export async function POST(request: NextRequest) {
     try {
-        // Verifica autenticação
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        // Verifica autenticação com Supabase
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+        if (authError || !user?.email) {
             return NextResponse.json(
                 { error: "Você precisa estar logado." },
                 { status: 401 }
+            )
+        }
+
+        // Busca usuário no Prisma (por email)
+        const dbUser = await prisma.user.findUnique({
+            where: { email: user.email },
+            select: { id: true }
+        })
+
+        if (!dbUser) {
+            return NextResponse.json(
+                { error: "Usuário não encontrado." },
+                { status: 404 }
             )
         }
 
@@ -46,10 +60,10 @@ export async function POST(request: NextRequest) {
 
         // Verifica créditos
         try {
-            await CreditService.assertUserHasCredits(session.user.id, COST_CREDITS)
+            await CreditService.assertUserHasCredits(dbUser.id, COST_CREDITS)
         } catch (e) {
             // Busca saldo atual para mensagem de erro
-            const balance = await CreditService.getBalance(session.user.id)
+            const balance = await CreditService.getBalance(dbUser.id)
             return NextResponse.json(
                 { error: "Créditos insuficientes.", required: COST_CREDITS, available: balance.totalCredits },
                 { status: 402 }
@@ -63,7 +77,7 @@ export async function POST(request: NextRequest) {
         // Cria registro no banco
         const job = await prisma.faceSwapJob.create({
             data: {
-                userId: session.user.id,
+                userId: dbUser.id,
                 status: "PENDING",
                 sourceImage: sourceImage, // Mantém o original com prefixo para exibição
                 targetImage: targetImage,
@@ -135,6 +149,7 @@ export async function POST(request: NextRequest) {
         }
 
         const runpodData = await runpodResponse.json()
+        console.log("[Face Swap Create] RunPod response:", JSON.stringify(runpodData, null, 2))
 
         // Atualiza job com ID do RunPod
         await prisma.faceSwapJob.update({
@@ -144,6 +159,8 @@ export async function POST(request: NextRequest) {
                 status: "IN_PROGRESS",
             },
         })
+
+        console.log("[Face Swap Create] Job updated with RunPod ID:", runpodData.id)
 
         return NextResponse.json({
             success: true,

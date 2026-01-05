@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Image, Tag, Users, TrendingUp, MessageSquare } from "lucide-react"
+import { Image, Tag, Users, TrendingUp, MessageSquare, Coins } from "lucide-react"
 
 interface Stats {
     totalModels: number
     totalTags: number
     totalGenerations: number
     totalUsers: number
+    totalRevenue: number
+    totalCreditsUsed: number
 }
 
 
@@ -19,30 +21,63 @@ export default function AdminDashboard() {
         totalModels: 0,
         totalTags: 0,
         totalGenerations: 0,
-        totalUsers: 0
+        totalUsers: 0,
+        totalRevenue: 0,
+        totalCreditsUsed: 0
     })
 
     useEffect(() => {
-        // Carregar estatísticas
+        // Carregar estatísticas consolidadas
         Promise.all([
-            fetch("/api/admin/models").then(r => r.json()),
-            fetch("/api/admin/tags").then(r => r.json()),
-            fetch("/api/admin/users").then(r => r.json())
-        ]).then(([modelsData, tagsData, usersData]) => {
-            setStats(prev => ({
-                ...prev,
+            fetch("/api/admin/history").then(r => r.json()),
+            fetch("/api/admin/models").then(r => r.json()), // Ainda precisamos disso para contagem de modelos?
+            // Se /api/admin/history não retorna modelos, mantemos. 
+            // Mas o plano era simplificar. Vamos manter models separado pois history foca em uso.
+        ]).then(([historyData, modelsData]) => {
+            setStats({
                 totalModels: modelsData.models?.length || 0,
-                totalTags: tagsData.tags?.length || 0,
-                totalUsers: usersData?.length || 0
-            }))
+                totalTags: 0, // Removendo tags do destaque principal se não for crítico
+                totalGenerations: historyData.totalGenerations || 0,
+                totalUsers: historyData.totalUsers || 0,
+                totalRevenue: historyData.totalRevenue || 0,
+                totalCreditsUsed: historyData.totalCreditsUsed || 0
+            })
         }).catch(console.error)
     }, [])
 
     const cards = [
-        { label: "Modelos", description: "Gerenciar modelos de IA", value: stats.totalModels, icon: Image, color: "bg-blue-500", href: "/admin/models" },
-        { label: "Usuários", description: "Ver usuários e gastos", value: stats.totalUsers, icon: Users, color: "bg-yellow-500", href: "/admin/users" },
-        { label: "Histórico", description: "Estatísticas e atividades", value: stats.totalGenerations, icon: TrendingUp, color: "bg-green-500", href: "/admin/history" },
-        { label: "Suporte", description: "Mensagens recebidas", value: "Ver", icon: MessageSquare, color: "bg-pink-500", href: "/admin/support" },
+        {
+            label: "Gerações Totais",
+            description: "Ensaio, Face Swap e Upscale",
+            value: stats.totalGenerations,
+            icon: Image,
+            color: "bg-blue-500",
+            href: "/admin/history"
+        },
+        {
+            label: "Usuários",
+            description: "Total de cadastros",
+            value: stats.totalUsers,
+            icon: Users,
+            color: "bg-yellow-500",
+            href: "/admin/users"
+        },
+        {
+            label: "Receita",
+            description: "Total em vendas",
+            value: stats.totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+            icon: TrendingUp,
+            color: "bg-green-500",
+            href: "/admin/history"
+        },
+        {
+            label: "Créditos Consumidos",
+            description: "Uso total da plataforma",
+            value: stats.totalCreditsUsed,
+            icon: Coins,
+            color: "bg-purple-500",
+            href: "/admin/history"
+        },
     ]
 
     return (

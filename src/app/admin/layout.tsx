@@ -1,23 +1,38 @@
 "use client"
 
-import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, ReactNode } from "react"
+import { useEffect, useState, ReactNode } from "react"
 import { Settings, Image, Tag, LayoutDashboard, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-    const { data: session, status } = useSession()
     const router = useRouter()
+    const [isLoading, setIsLoading] = useState(true)
+    const [isAuthorized, setIsAuthorized] = useState(false)
 
     useEffect(() => {
-        if (status === "loading") return
-        if (!session || session.user?.role !== "ADMIN") {
-            router.push("/")
-        }
-    }, [session, status, router])
+        // Verifica permissão via API (que consulta o banco Prisma)
+        fetch("/api/user")
+            .then(res => {
+                if (res.ok) return res.json()
+                throw new Error("Não autenticado")
+            })
+            .then(data => {
+                if (data.user && data.user.role === "ADMIN") {
+                    setIsAuthorized(true)
+                } else {
+                    router.push("/")
+                }
+            })
+            .catch(() => {
+                router.push("/")
+            })
+            .finally(() => {
+                setIsLoading(false)
+            })
+    }, [router])
 
-    if (status === "loading") {
+    if (isLoading) {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
                 <div className="animate-spin w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full" />
@@ -25,7 +40,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         )
     }
 
-    if (!session || session.user?.role !== "ADMIN") {
+    if (!isAuthorized) {
         return null
     }
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/hooks/useAuth"
 import { useRouter } from "next/navigation"
 import { Loader2, Image as ImageIcon, Download, ArrowLeft, Sparkles, Star, Zap } from "lucide-react"
 import Header from "@/components/Header"
@@ -9,7 +9,6 @@ import UploadSection from "@/components/UploadSection"
 import AspectRatioSelector from "@/components/AspectRatioSelector"
 import ModelGallery from "@/components/ModelGallery"
 import PricingModal from "@/components/PricingModal"
-import LoginModal from "@/components/LoginModal"
 import { PhotoModel, GeneratedImage } from "@/types"
 import { fileToBase64 } from "@/lib/nanoBanana"
 
@@ -55,7 +54,7 @@ const QUALITY_TIERS = [
 ]
 
 export default function EnsaioPage() {
-    const { data: session, status, update: updateSession } = useSession()
+    const { user, loading, credits, refreshCredits } = useAuth("/login")
     const router = useRouter()
 
     // State
@@ -68,30 +67,15 @@ export default function EnsaioPage() {
     const [isGenerating, setIsGenerating] = useState(false)
     const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([])
     const [error, setError] = useState<string | null>(null)
-    const [showLoginModal, setShowLoginModal] = useState(false)
 
     const currentTier = QUALITY_TIERS.find(t => t.id === selectedTier) || QUALITY_TIERS[1]
     const totalCredits = currentTier.credits
 
-    useEffect(() => {
-        if (status === "unauthenticated") {
-            router.push("/")
-        }
-    }, [status, router])
-
-    useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search)
-        if (urlParams.get("success") === "true") {
-            updateSession()
-            window.history.replaceState({}, "", "/ensaio")
-        }
-    }, [updateSession])
-
     const handleGenerate = async () => {
         setError(null)
 
-        if (!session?.user) {
-            setShowLoginModal(true)
+        if (!user) {
+            router.push("/login")
             return
         }
 
@@ -105,7 +89,7 @@ export default function EnsaioPage() {
             return
         }
 
-        if ((session.user.credits ?? 0) < totalCredits) {
+        if ((credits ?? 0) < totalCredits) {
             setIsPricingOpen(true)
             return
         }
@@ -148,7 +132,7 @@ export default function EnsaioPage() {
             }
             setGeneratedImages(prev => [newImage, ...prev])
 
-            await updateSession()
+            await refreshCredits()
 
             setTimeout(() => {
                 const galleryElement = document.getElementById("results-gallery")
@@ -163,7 +147,7 @@ export default function EnsaioPage() {
         }
     }
 
-    if (status === "loading") {
+    if (loading) {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
@@ -171,13 +155,13 @@ export default function EnsaioPage() {
         )
     }
 
-    if (!session) return null
+    if (!user) return null
 
     return (
         <div className="min-h-screen bg-zinc-950 flex flex-col font-sans text-zinc-100">
             <Header
                 onOpenPricing={() => setIsPricingOpen(true)}
-                onOpenLogin={() => setShowLoginModal(true)}
+                onOpenLogin={() => router.push('/login')}
             />
 
             <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl">
@@ -300,7 +284,7 @@ export default function EnsaioPage() {
                             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                                 <div className="text-sm text-zinc-400">
                                     <p>Modelo: <span className="text-white font-medium">{selectedModel?.name || "Nenhum"}</span></p>
-                                    <p>Custo: <span className="text-yellow-400 font-bold">{totalCredits} créditos</span> | Saldo: {session?.user?.credits ?? 0}</p>
+                                    <p>Custo: <span className="text-yellow-400 font-bold">{totalCredits} créditos</span> | Saldo: {credits ?? 0}</p>
                                 </div>
 
                                 <button
@@ -378,11 +362,6 @@ export default function EnsaioPage() {
             <PricingModal
                 isOpen={isPricingOpen}
                 onClose={() => setIsPricingOpen(false)}
-            />
-
-            <LoginModal
-                isOpen={showLoginModal}
-                onClose={() => setShowLoginModal(false)}
             />
         </div>
     )

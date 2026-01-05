@@ -2,10 +2,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/hooks/useAuth"
 import { useRouter } from "next/navigation"
 import Header from "@/components/Header"
-import LoginModal from "@/components/LoginModal"
 import PricingModal from "@/components/PricingModal"
 import { Download, Calendar, ArrowLeft, Loader2, Image as ImageIcon } from "lucide-react"
 
@@ -22,24 +21,17 @@ interface Generation {
 }
 
 export default function MyPhotosPage() {
-    const { data: session, status } = useSession()
+    const { user, loading } = useAuth("/login")
     const router = useRouter()
     const [generations, setGenerations] = useState<Generation[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [isPricingOpen, setIsPricingOpen] = useState(false)
-    const [showLoginModal, setShowLoginModal] = useState(false)
 
     useEffect(() => {
-        if (status === "unauthenticated") {
-            router.push("/")
-        }
-    }, [status, router])
-
-    useEffect(() => {
-        if (session?.user) {
+        if (user) {
             fetchGenerations()
         }
-    }, [session])
+    }, [user])
 
     const fetchGenerations = async () => {
         try {
@@ -55,7 +47,7 @@ export default function MyPhotosPage() {
         }
     }
 
-    if (status === "loading") {
+    if (loading) {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
@@ -67,7 +59,7 @@ export default function MyPhotosPage() {
         <div className="min-h-screen bg-zinc-950 flex flex-col font-sans text-zinc-100">
             <Header
                 onOpenPricing={() => setIsPricingOpen(true)}
-                onOpenLogin={() => setShowLoginModal(true)}
+                onOpenLogin={() => router.push('/login')}
             />
 
             <main className="flex-1 container mx-auto px-4 py-8 max-w-5xl">
@@ -157,11 +149,6 @@ export default function MyPhotosPage() {
             <PricingModal
                 isOpen={isPricingOpen}
                 onClose={() => setIsPricingOpen(false)}
-            />
-
-            <LoginModal
-                isOpen={showLoginModal}
-                onClose={() => setShowLoginModal(false)}
             />
         </div>
     )

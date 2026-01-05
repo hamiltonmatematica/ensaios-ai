@@ -1,5 +1,4 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { createClient } from "@/lib/supabase-server"
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
 
@@ -7,11 +6,13 @@ export const dynamic = 'force-dynamic'
 
 // Verifica se é admin
 async function checkAdmin() {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) return false
+    const supabase = await createClient()
+    const { data: { user: authUser }, error } = await supabase.auth.getUser()
+
+    if (error || !authUser?.email) return false
 
     const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
+        where: { email: authUser.email },
         select: { role: true }
     })
     return user?.role === "ADMIN"

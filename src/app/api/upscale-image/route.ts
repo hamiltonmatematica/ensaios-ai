@@ -1,5 +1,4 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { createClient } from "@/lib/supabase-server"
 import { CreditService } from "@/lib/credit-service"
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
@@ -22,12 +21,27 @@ function cleanBase64(data: string): string {
 
 export async function POST(request: NextRequest) {
     try {
-        // 1. Autenticação
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
+        // 1. Autenticação com Supabase
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+        if (authError || !user?.email) {
             return NextResponse.json(
                 { error: "Você precisa estar logado." },
                 { status: 401 }
+            )
+        }
+
+        // Busca usuário no Prisma
+        const dbUser = await prisma.user.findUnique({
+            where: { email: user.email },
+            select: { id: true }
+        })
+
+        if (!dbUser) {
+            return NextResponse.json(
+                { error: "Usuário não encontrado." },
+                { status: 404 }
             )
         }
 
@@ -46,12 +60,12 @@ export async function POST(request: NextRequest) {
 
         // 3. Verificar créditos
         const creditsRequired = CREDITS_BY_SCALE[scale || "4x"] || 20
-        await CreditService.assertUserHasCredits(session.user.id, creditsRequired)
+        await CreditService.assertUserHasCredits(dbUser.id, creditsRequired)
 
         // 4. Criar registro no banco (status: processing)
         const job = await prisma.imageUpscale.create({
             data: {
-                userId: session.user.id,
+                userId: dbUser.id,
                 status: "processing",
                 imageUrl: image,
                 scale: scale || "4x",

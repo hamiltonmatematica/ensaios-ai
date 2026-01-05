@@ -1,5 +1,4 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { createClient } from "@/lib/supabase-server"
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 
@@ -8,9 +7,10 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
     try {
-        const session = await getServerSession(authOptions)
+        const supabase = await createClient()
+        const { data: { user: supabaseUser }, error: authError } = await supabase.auth.getUser()
 
-        if (!session?.user?.id) {
+        if (authError || !supabaseUser?.email) {
             return NextResponse.json(
                 { error: "Não autenticado." },
                 { status: 401 }
@@ -18,7 +18,7 @@ export async function GET() {
         }
 
         const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { email: supabaseUser.email },
             select: {
                 id: true,
                 credits: true,

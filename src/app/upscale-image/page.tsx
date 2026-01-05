@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/hooks/useAuth"
 import { useRouter } from "next/navigation"
 import {
     ImagePlus,
@@ -16,7 +16,7 @@ import {
 } from "lucide-react"
 import Header from "@/components/Header"
 import PricingModal from "@/components/PricingModal"
-import LoginModal from "@/components/LoginModal"
+
 
 const SCALE_OPTIONS = [
     { id: "2x", label: "2x", credits: 10, description: "Dobra a resolução" },
@@ -24,7 +24,7 @@ const SCALE_OPTIONS = [
 ]
 
 export default function UpscaleImagePage() {
-    const { data: session, status, update: updateSession } = useSession()
+    const { user, loading, credits, refreshCredits } = useAuth("/login")
     const router = useRouter()
 
     // Form state
@@ -38,19 +38,51 @@ export default function UpscaleImagePage() {
     const [result, setResult] = useState<{ id: string; resultUrl: string } | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [isPricingOpen, setIsPricingOpen] = useState(false)
-    const [showLoginModal, setShowLoginModal] = useState(false)
+
     const [retryCount, setRetryCount] = useState(0)
 
     const currentCredits = SCALE_OPTIONS.find(s => s.id === scale)?.credits || 20
     const MAX_RETRIES = 12 // 12 tentativas x 5s = 60 segundos
 
-    useEffect(() => {
-        if (status === "unauthenticated") {
-            router.push("/")
-        }
-    }, [status, router])
+    const resizeImage = (file: File): Promise<string> => {
+        return new Promise((resolve) => {
+            const reader = new FileReader()
+            reader.onload = (e) => {
+                const img = new Image()
+                img.onload = () => {
+                    const canvas = document.createElement('canvas')
+                    let width = img.width
+                    let height = img.height
 
-    const handleImageUpload = useCallback((file: File) => {
+                    // Limite máximo seguro para garantir que upscale 4x caiba na VRAM (24GB)
+                    // 2048 * 4 = 8192px (8k resolução final)
+                    const MAX_DIMENSION = 2048
+
+                    if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+                        if (width > height) {
+                            height = (height / width) * MAX_DIMENSION
+                            width = MAX_DIMENSION
+                        } else {
+                            width = (width / height) * MAX_DIMENSION
+                            height = MAX_DIMENSION
+                        }
+                    }
+
+                    canvas.width = width
+                    canvas.height = height
+                    const ctx = canvas.getContext('2d')
+                    ctx?.drawImage(img, 0, 0, width, height)
+
+                    // Converte para JPEG com qualidade 90%
+                    resolve(canvas.toDataURL('image/jpeg', 0.9))
+                }
+                img.src = e.target?.result as string
+            }
+            reader.readAsDataURL(file)
+        })
+    }
+
+    const handleImageUpload = useCallback(async (file: File) => {
         if (!file.type.startsWith("image/")) {
             setError("Por favor, envie apenas imagens")
             return
@@ -62,19 +94,23 @@ export default function UpscaleImagePage() {
         }
 
         setImageFile(file)
-        const reader = new FileReader()
-        reader.onload = (e) => {
-            setImage(e.target?.result as string)
+
+        try {
+            // Redimensiona se necessário antes de setar
+            const resizedBase64 = await resizeImage(file)
+            setImage(resizedBase64)
             setError(null)
+        } catch (e) {
+            console.error("Erro ao processar imagem:", e)
+            setError("Erro ao processar imagem")
         }
-        reader.readAsDataURL(file)
     }, [])
 
     const handleUpscale = async () => {
         setError(null)
 
-        if (!session?.user) {
-            setShowLoginModal(true)
+        if (!user) {
+            router.push("/login")
             return
         }
 
@@ -83,13 +119,13 @@ export default function UpscaleImagePage() {
             return
         }
 
-        if ((session.user.credits ?? 0) < currentCredits) {
+        if ((credits ?? 0) < currentCredits) {
             setIsPricingOpen(true)
             return
         }
 
         setIsProcessing(true)
-        setProcessingStatus("Iniciando upscale...")
+        setProcessingStatus("Preparando sua imagem...")
 
         try {
             const res = await fetch("/api/upscale-image", {
@@ -116,7 +152,7 @@ export default function UpscaleImagePage() {
 
                 const retryAfter = data.retryAfter || 5
                 setRetryCount(prev => prev + 1)
-                setProcessingStatus(`Servidor inicializando... Tentativa ${retryCount + 1}/${MAX_RETRIES}`)
+                setProcessingStatus(`Preparando servidor... Aguarde um momento`)
 
                 setTimeout(() => {
                     handleUpscale() // Retry recursivo
@@ -141,12 +177,12 @@ export default function UpscaleImagePage() {
                 })
                 setProcessingStatus("")
                 setIsProcessing(false)
-                await updateSession()
+                await refreshCredits()
                 return
             }
 
             // Polling
-            setProcessingStatus("Processando imagem...")
+            setProcessingStatus("Melhorando sua imagem...")
             const pollInterval = setInterval(async () => {
                 try {
                     const statusRes = await fetch(`/api/upscale-image/status/${jobId}`)
@@ -160,14 +196,14 @@ export default function UpscaleImagePage() {
                         })
                         setProcessingStatus("")
                         setIsProcessing(false)
-                        await updateSession()
+                        await refreshCredits()
                     } else if (statusData.status === "FAILED" || statusData.status === "failed") {
                         clearInterval(pollInterval)
                         setError(statusData.error || "Erro no upscale. Tente novamente.")
                         setProcessingStatus("")
                         setIsProcessing(false)
                     } else {
-                        setProcessingStatus(`Processando... ${statusData.status}`)
+                        setProcessingStatus("Aplicando melhoria de qualidade...")
                     }
                 } catch (e) {
                     console.error("Erro no polling:", e)
@@ -206,7 +242,7 @@ export default function UpscaleImagePage() {
         setError(null)
     }
 
-    if (status === "loading") {
+    if (loading) {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
@@ -214,13 +250,13 @@ export default function UpscaleImagePage() {
         )
     }
 
-    if (!session) return null
+    if (!user) return null
 
     return (
         <div className="min-h-screen bg-zinc-950 flex flex-col font-sans text-zinc-100">
             <Header
                 onOpenPricing={() => setIsPricingOpen(true)}
-                onOpenLogin={() => setShowLoginModal(true)}
+                onOpenLogin={() => router.push("/login")}
             />
 
             <main className="flex-1 container mx-auto px-4 py-8 max-w-5xl">
@@ -356,9 +392,14 @@ export default function UpscaleImagePage() {
                                 </h3>
                                 <div className="rounded-xl overflow-hidden bg-black">
                                     <img
+                                        key={result.id}
                                         src={result.resultUrl}
                                         alt="Upscaled"
                                         className="w-full h-auto"
+                                        onError={(e) => {
+                                            console.error("Erro ao carregar imagem:", result.resultUrl)
+                                            e.currentTarget.src = result.resultUrl + "?retry=" + Date.now()
+                                        }}
                                     />
                                 </div>
                                 <div className="flex gap-3">
@@ -386,7 +427,7 @@ export default function UpscaleImagePage() {
                                         <span className="font-semibold text-white">Seus Créditos</span>
                                     </div>
                                     <p className="text-3xl font-bold text-white mb-3">
-                                        {session.user?.credits ?? 0}
+                                        {credits ?? 0}
                                     </p>
                                     <button
                                         onClick={() => setIsPricingOpen(true)}
@@ -427,10 +468,7 @@ export default function UpscaleImagePage() {
                 onClose={() => setIsPricingOpen(false)}
             />
 
-            <LoginModal
-                isOpen={showLoginModal}
-                onClose={() => setShowLoginModal(false)}
-            />
+
         </div>
     )
 }

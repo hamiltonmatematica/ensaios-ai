@@ -1,8 +1,8 @@
 "use client"
 
-import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase-client"
 import dynamic from 'next/dynamic'
 import {
     Camera,
@@ -22,28 +22,48 @@ const PricingModal = dynamic(() => import('@/components/PricingModal'), {
     ssr: false
 })
 
-const LoginModal = dynamic(() => import('@/components/LoginModal'), {
-    loading: () => null,
-    ssr: false
-})
-
 export default function DashboardPage() {
-    const { data: session, status } = useSession()
     const router = useRouter()
+    const [user, setUser] = useState<any>(null)
+    const [credits, setCredits] = useState(0)
+    const [userName, setUserName] = useState("")
+    const [loading, setLoading] = useState(true)
     const [isPricingOpen, setIsPricingOpen] = useState(false)
-    const [showLoginModal, setShowLoginModal] = useState(false)
+    const supabase = createClient()
 
     // TODO: Implementar lógica de expiração de créditos
     const showExpirationWarning = false
 
-    // Redireciona para home se não estiver logado
     useEffect(() => {
-        if (status === "unauthenticated") {
-            router.push("/")
-        }
-    }, [status, router])
+        // Verificar autenticação
+        supabase.auth.getUser().then(({ data: { user }, error }) => {
+            if (error || !user) {
+                router.push("/login")
+                return
+            }
 
-    if (status === "loading") {
+            setUser(user)
+
+            // Buscar dados do usuário (nome e créditos)
+            Promise.all([
+                fetch('/api/user').then(res => res.json()),
+                fetch('/api/credits/check-balance').then(res => res.json())
+            ]).then(([userData, creditsData]) => {
+                if (userData.user) {
+                    setUserName(userData.user.name || '')
+                    setCredits(userData.user.credits || 0)
+                }
+                if (creditsData.totalCredits !== undefined) {
+                    setCredits(creditsData.totalCredits)
+                }
+                setLoading(false)
+            }).catch(() => {
+                setLoading(false)
+            })
+        })
+    }, [router])
+
+    if (loading) {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
@@ -51,7 +71,7 @@ export default function DashboardPage() {
         )
     }
 
-    if (!session) {
+    if (!user) {
         return null
     }
 
@@ -59,14 +79,14 @@ export default function DashboardPage() {
         <div className="min-h-screen bg-zinc-950 flex flex-col font-sans text-zinc-100">
             <Header
                 onOpenPricing={() => setIsPricingOpen(true)}
-                onOpenLogin={() => setShowLoginModal(true)}
+                onOpenLogin={() => router.push('/login')}
             />
 
             <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl">
                 {/* Welcome Section */}
                 <div className="mb-10">
                     <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-                        Olá, {session.user?.name?.split(" ")[0] || "Usuário"}! 👋
+                        Olá, {userName?.split(" ")[0] || "Usuário"}! 👋
                     </h1>
                     <p className="text-zinc-400">
                         O que você gostaria de criar hoje?
@@ -84,7 +104,7 @@ export default function DashboardPage() {
                             <div className="flex-1">
                                 <p className="text-sm text-zinc-400">Seus Créditos</p>
                                 <p className="text-2xl font-bold text-white">
-                                    {session.user?.credits ?? 0}
+                                    {credits}
                                     <span className="text-sm font-normal text-zinc-400 ml-2">disponíveis</span>
                                 </p>
                             </div>
@@ -172,13 +192,6 @@ export default function DashboardPage() {
                 <PricingModal
                     isOpen={isPricingOpen}
                     onClose={() => setIsPricingOpen(false)}
-                />
-            )}
-
-            {showLoginModal && (
-                <LoginModal
-                    isOpen={showLoginModal}
-                    onClose={() => setShowLoginModal(false)}
                 />
             )}
         </div>

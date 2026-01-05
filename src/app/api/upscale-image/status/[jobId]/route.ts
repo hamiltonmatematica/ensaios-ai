@@ -1,5 +1,4 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { createClient } from "@/lib/supabase-server"
 import { prisma } from "@/lib/prisma"
 import { CreditService } from "@/lib/credit-service"
 import { NextRequest, NextResponse } from "next/server"
@@ -14,12 +13,21 @@ export async function GET(
     { params }: { params: Promise<{ jobId: string }> }
 ) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user?.id) {
-            return NextResponse.json(
-                { error: "Não autorizado" },
-                { status: 401 }
-            )
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+        if (authError || !user?.email) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
+        // Busca usuário no Prisma
+        const dbUser = await prisma.user.findUnique({
+            where: { email: user.email },
+            select: { id: true }
+        })
+
+        if (!dbUser) {
+            return NextResponse.json({ error: "User not found" }, { status: 404 })
         }
 
         const { jobId } = await params
@@ -30,25 +38,21 @@ export async function GET(
         })
 
         if (!upscaleJob) {
-            return NextResponse.json(
-                { error: "Job não encontrado" },
-                { status: 404 }
-            )
+            return NextResponse.json({ error: "Job não encontrado" }, { status: 404 })
         }
 
         // Verificar se pertence ao usuário
-        if (upscaleJob.userId !== session.user.id) {
-            return NextResponse.json(
-                { error: "Acesso negado" },
-                { status: 403 }
-            )
+        if (upscaleJob.userId !== dbUser.id) {
+            return NextResponse.json({ error: "Acesso negado" }, { status: 403 })
         }
 
         // Se já completou
         if (upscaleJob.status === "completed" && upscaleJob.resultUrl) {
+            // Retornar URL do proxy
+            const imageUrl = `/api/upscale-image/image/${jobId}`
             return NextResponse.json({
                 status: "COMPLETED",
-                resultUrl: upscaleJob.resultUrl,
+                resultUrl: imageUrl,
             })
         }
 
@@ -86,34 +90,21 @@ export async function GET(
 
         const runpodData = await runpodResponse.json()
 
-        console.log("[UPSCALE STATUS] RunPod response:", JSON.stringify(runpodData, null, 2))
-
         if (runpodData.status === "COMPLETED") {
-            // Extrai resultado - pode vir como output.output ou output diretamente (igual ao face-swap)
             let resultUrl = runpodData.output?.output || runpodData.output
 
-            console.log("[UPSCALE STATUS] Raw output type:", typeof resultUrl)
-            console.log("[UPSCALE STATUS] Raw output (first 100 chars):", typeof resultUrl === 'string' ? resultUrl.substring(0, 100) : resultUrl)
-
-            // Se for objeto com image ou image_base64, pega o valor
             if (typeof resultUrl === "object" && resultUrl !== null) {
                 if (resultUrl.image) {
                     resultUrl = resultUrl.image
                 } else if (resultUrl.image_base64) {
                     resultUrl = resultUrl.image_base64
-                } else {
-                    console.error("[UPSCALE STATUS] Output is object but has no expected field. Keys:", Object.keys(resultUrl))
                 }
             }
 
-            // Adiciona prefixo base64 se necessário
             if (resultUrl && typeof resultUrl === "string" && !resultUrl.startsWith("data:") && !resultUrl.startsWith("http")) {
                 resultUrl = `data:image/png;base64,${resultUrl}`
             }
 
-            console.log("[UPSCALE STATUS] Final resultUrl:", resultUrl?.substring(0, 100))
-
-            // Atualizar banco
             await prisma.imageUpscale.update({
                 where: { id: jobId },
                 data: {
@@ -122,21 +113,22 @@ export async function GET(
                 },
             })
 
-            // Deduzir créditos usando CreditService
             try {
                 await CreditService.consumeCredits(
-                    session.user.id,
+                    dbUser.id,
                     upscaleJob.creditsUsed,
                     `UPSCALE_${upscaleJob.scale}`
                 )
             } catch (error) {
                 console.error("Erro ao debitar créditos (Upscale):", error)
-                // Não falha o job, mas loga erro crítico
             }
+
+            // Retornar URL do proxy ao invés do base64 completo
+            const imageUrl = `/api/upscale-image/image/${jobId}`
 
             return NextResponse.json({
                 status: "COMPLETED",
-                resultUrl: resultUrl,
+                resultUrl: imageUrl,
             })
 
         } else if (runpodData.status === "FAILED") {

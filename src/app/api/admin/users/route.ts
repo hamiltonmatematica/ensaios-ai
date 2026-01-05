@@ -1,17 +1,18 @@
 
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { createClient } from "@/lib/supabase-server"
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 
 export const dynamic = 'force-dynamic'
 
 async function checkAdmin() {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) return false
+    const supabase = await createClient()
+    const { data: { user: authUser }, error } = await supabase.auth.getUser()
+
+    if (error || !authUser?.email) return false
 
     const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
+        where: { email: authUser.email },
         select: { role: true }
     })
     return user?.role === "ADMIN"
@@ -32,6 +33,7 @@ export async function GET() {
                     transactions: true
                 }
             },
+            creditBalance: true, // Incluir saldo V2
             transactions: {
                 where: { status: "completed" }, // ou "paid", dependendo do webhook
                 select: { amount: true }
@@ -43,11 +45,14 @@ export async function GET() {
 
     const formattedUsers = users.map(user => {
         const totalSpent = user.transactions.reduce((acc, curr) => acc + curr.amount, 0)
+        // Usa saldo do creditBalance (V2) ou fallback para credits (legado)
+        const totalCredits = user.creditBalance?.totalCredits ?? user.credits ?? 0
+
         return {
             id: user.id,
             name: user.name,
             email: user.email,
-            credits: user.credits,
+            credits: totalCredits,
             role: user.role,
             totalGenerations: user._count.generations,
             totalSpent: totalSpent,
@@ -146,9 +151,19 @@ export async function DELETE(req: Request) {
         }
 
         // Não permite deletar a si mesmo
-        const session = await getServerSession(authOptions)
-        if (session?.user?.id === id) {
-            return NextResponse.json({ error: "Você não pode deletar sua própria conta" }, { status: 400 })
+        const supabase = await createClient()
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+
+        // Busca ID do usuário logado via Prisma (via email do Supabase)
+        if (currentUser?.email) {
+            const adminUser = await prisma.user.findUnique({
+                where: { email: currentUser.email },
+                select: { id: true }
+            })
+
+            if (adminUser?.id === id) {
+                return NextResponse.json({ error: "Você não pode deletar sua própria conta" }, { status: 400 })
+            }
         }
 
         // Deleta o usuário (isso vai cascatear para deletar gerações, etc. se configurado no schema)

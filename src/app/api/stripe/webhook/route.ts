@@ -2,6 +2,7 @@ import { getStripe } from "@/lib/stripe"
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
+import { CreditService } from "@/lib/credit-service"
 
 // Evita pre-rendering durante build
 export const dynamic = 'force-dynamic'
@@ -57,35 +58,14 @@ export async function POST(request: NextRequest) {
                     },
                 })
 
-                // Adiciona créditos ao usuário (+ sistema V2 CreditBalance)
-                const user = await prisma.user.findUnique({
-                    where: { id: userId },
-                    include: { creditBalance: true }
-                })
-
-                if (user) {
-                    if (user.creditBalance) {
-                        // Usuário já migrado: atualiza tabela nova
-                        await prisma.creditBalance.update({
-                            where: { userId },
-                            data: { totalCredits: { increment: credits } }
-                        })
-                    } else {
-                        // Usuário legado: cria tabela nova somando saldo antigo + compra
-                        await prisma.creditBalance.create({
-                            data: {
-                                userId,
-                                totalCredits: (user.credits ?? 0) + credits
-                            }
-                        })
-                    }
-
-                    // (Opcional) Mantém campo legado atualizado por segurança, mas o app usa CreditBalance
-                    /* await prisma.user.update({
-                        where: { id: userId },
-                        data: { credits: { increment: credits } }
-                    }) */
-                }
+                // Adiciona créditos usando o serviço centralizado
+                // Isso garante registros de transação corretos e compatibilidade com o sistema atual
+                await CreditService.addCredits(
+                    userId,
+                    credits,
+                    "PURCHASE",
+                    `Compra de pacote: ${packageId || "unknown"} (Stripe: ${session.id})`
+                )
 
                 console.log(`✅ ${credits} créditos adicionados ao usuário ${userId}`)
             } catch (dbError) {

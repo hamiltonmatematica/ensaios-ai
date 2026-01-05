@@ -1,27 +1,19 @@
 "use client"
 
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/hooks/useAuth"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Loader2, ArrowLeft } from "lucide-react"
 import Header from "@/components/Header"
 import HistorySection from "@/components/HistorySection"
-import LoginModal from "@/components/LoginModal"
 import PricingModal from "@/components/PricingModal"
 
 export default function HistoryPage() {
-    const { data: session, status } = useSession()
+    const { user, loading } = useAuth("/login")
     const router = useRouter()
     const [isPricingOpen, setIsPricingOpen] = useState(false)
-    const [showLoginModal, setShowLoginModal] = useState(false)
 
-    useEffect(() => {
-        if (status === "unauthenticated") {
-            router.push("/")
-        }
-    }, [status, router])
-
-    if (status === "loading") {
+    if (loading) {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
@@ -29,13 +21,13 @@ export default function HistoryPage() {
         )
     }
 
-    if (!session) return null
+    if (!user) return null
 
     return (
         <div className="min-h-screen bg-zinc-950 flex flex-col font-sans text-zinc-100">
             <Header
                 onOpenPricing={() => setIsPricingOpen(true)}
-                onOpenLogin={() => setShowLoginModal(true)}
+                onOpenLogin={() => router.push('/login')}
             />
 
             <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl">
@@ -56,11 +48,6 @@ export default function HistoryPage() {
             <PricingModal
                 isOpen={isPricingOpen}
                 onClose={() => setIsPricingOpen(false)}
-            />
-
-            <LoginModal
-                isOpen={showLoginModal}
-                onClose={() => setShowLoginModal(false)}
             />
         </div>
     )
