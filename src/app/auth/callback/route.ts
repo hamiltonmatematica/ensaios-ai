@@ -37,7 +37,7 @@ export async function GET(request: Request) {
                     // verifyOtp já criou a sessão, só redireciona
                     return NextResponse.redirect(new URL('/redefinir-senha', request.url))
                 } else if (type === 'signup' || type === 'email') {
-                    return NextResponse.redirect(new URL('/email-confirmado', request.url))
+                    return NextResponse.redirect(new URL('/email-confirmado?verified=true', request.url))
                 } else if (type === 'email_change') {
                     return NextResponse.redirect(new URL(next, request.url))
                 } else if (type === 'magiclink') {

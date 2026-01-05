@@ -16,47 +16,63 @@ function EmailConfirmadoContent() {
     const supabase = createClient()
 
     useEffect(() => {
-        const verifyToken = async () => {
+        const checkStatus = async () => {
             const tokenHash = searchParams.get("token_hash")
             const type = searchParams.get("type")
+            const verified = searchParams.get("verified")
 
-            if (!tokenHash || !type) {
-                setState("error")
-                setMessage({ type: "error", text: "Link inválido ou expirado." })
+            // Se veio do callback com verified=true, ou se já temos sessão
+            if (verified === "true") {
+                const { data: { user } } = await supabase.auth.getUser()
+                if (user) {
+                    setState("setPassword") // Assume que precisa definir senha se veio de signup
+                    setIsLoading(false)
+                    return
+                }
+            }
+
+            // Fallback: Tenta verificar token se fornecido (fluxo legado ou direto)
+            if (tokenHash && type) {
+                try {
+                    const { error } = await supabase.auth.verifyOtp({
+                        token_hash: tokenHash,
+                        type: type as "email" | "signup",
+                    })
+
+                    if (error) {
+                        setState("error")
+                        setMessage({ type: "error", text: "Token inválido ou expirado." })
+                    } else {
+                        setState("setPassword") // Permite definir senha após verificação
+                    }
+                } catch (error) {
+                    console.error(error)
+                    setState("error")
+                    setMessage({ type: "error", text: "Erro ao verificar token." })
+                } finally {
+                    setIsLoading(false)
+                }
+                return
+            }
+
+            // Se chegamos aqui sem verified=true e sem token, verifica sessão existente
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user && user.email_confirmed_at) {
+                // Já logado e confirmado
+                setState("success")
+                setTimeout(() => router.push("/dashboard"), 1500)
                 setIsLoading(false)
                 return
             }
 
-            try {
-                const { error } = await supabase.auth.verifyOtp({
-                    token_hash: tokenHash,
-                    type: type as "email" | "signup",
-                })
-
-                if (error) {
-                    setState("error")
-                    setMessage({ type: "error", text: "Token inválido ou expirado." })
-                } else {
-                    // Email confirmado com sucesso - redireciona para dashboard
-                    setState("success")
-                    setMessage({ type: "success", text: "Email confirmado!" })
-
-                    // Redireciona automaticamente após 2 segundos
-                    setTimeout(() => {
-                        router.push("/dashboard")
-                    }, 2000)
-                }
-            } catch (error) {
-                console.error(error)
-                setState("error")
-                setMessage({ type: "error", text: "Erro ao verificar token." })
-            } finally {
-                setIsLoading(false)
-            }
+            // Se nada funcionou
+            setState("error")
+            setMessage({ type: "error", text: "Link inválido ou expirado." })
+            setIsLoading(false)
         }
 
-        verifyToken()
-    }, [searchParams, supabase.auth])
+        checkStatus()
+    }, [searchParams, supabase.auth, router])
 
     const handleSetPassword = async (e: React.FormEvent) => {
         e.preventDefault()
