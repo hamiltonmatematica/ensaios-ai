@@ -30,6 +30,12 @@ export default function LoginPage() {
 
             if (error) {
                 setMessage({ type: "error", text: "Email ou senha incorretos." })
+            } else if (data.user && !data.user.email_confirmed_at) {
+                await supabase.auth.signOut()
+                setMessage({
+                    type: "error",
+                    text: "Por favor, confirme seu email antes de fazer login."
+                })
             } else if (data.session) {
                 // Verificar controle de sessão
                 const sessionRes = await fetch("/api/session", {
