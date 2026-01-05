@@ -7,6 +7,21 @@ export async function GET(request: Request) {
     const type = requestUrl.searchParams.get('type') as 'recovery' | 'email' | 'magiclink' | 'signup' | 'email_change' | null
     const next = requestUrl.searchParams.get('next') || '/'
 
+    // Verificação de Código (PKCE) - Padrão novo do Supabase
+    const code = requestUrl.searchParams.get('code')
+    if (code) {
+        const supabase = await createClient()
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+
+        if (!error) {
+            return NextResponse.redirect(new URL(next, request.url))
+        } else {
+            const errorMsg = error.message || 'Erro ao trocar código por sessão'
+            return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(errorMsg)}`, request.url))
+        }
+    }
+
+    // Verificação de Token Hash (Legado/OTP)
     if (tokenHash && type) {
         const supabase = await createClient()
 
