@@ -14,21 +14,34 @@ export async function GET() {
     }
 
     // Busca usuário no Prisma
-    const dbUser = await prisma.user.findUnique({
-        where: { email: user.email },
-        select: { id: true }
-    })
+    try {
+        console.log(`[CheckBalance] Checking for user email: ${user.email}`)
 
-    if (!dbUser) {
-        return NextResponse.json({ error: "User not found" }, { status: 404 })
+        const dbUser = await prisma.user.findUnique({
+            where: { email: user.email },
+            select: { id: true }
+        })
+
+        if (!dbUser) {
+            console.log(`[CheckBalance] User not found in Prisma for email: ${user.email}`)
+            return NextResponse.json({ error: "User not found in database" }, { status: 404 })
+        }
+
+        // Check for migration (legacy credits -> new system)
+        await CreditService.checkMigration(dbUser.id)
+
+        const balance = await CreditService.getBalance(dbUser.id)
+
+        return NextResponse.json({
+            totalCredits: balance.totalCredits,
+        })
+    } catch (error: any) {
+        console.error("[CheckBalance] Critical Error:", error)
+        return NextResponse.json({
+            error: "Internal Server Error",
+            details: error.message,
+            code: error.code,
+            meta: error.meta
+        }, { status: 500 })
     }
-
-    // Check for migration (legacy credits -> new system)
-    await CreditService.checkMigration(dbUser.id)
-
-    const balance = await CreditService.getBalance(dbUser.id)
-
-    return NextResponse.json({
-        totalCredits: balance.totalCredits,
-    })
 }

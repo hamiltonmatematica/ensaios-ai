@@ -255,3 +255,16 @@ model CreditPurchaseHistory {
 }
 
 
+
+model UserSession {
+  id          String   @id @default(cuid())
+  userId      String
+  deviceInfo  String?  @map("device_info")
+  ipAddress   String?  @map("ip_address")
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ap_user_sessions")
+}
