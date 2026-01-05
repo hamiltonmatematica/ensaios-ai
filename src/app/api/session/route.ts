@@ -56,19 +56,11 @@ export async function POST(request: Request) {
                 })
 
                 if (sessions.length >= MAX_DEVICES) {
-                    return NextResponse.json(
-                        {
-                            error: 'Limite de dispositivos atingido',
-                            message: 'Você já está conectado em outro dispositivo',
-                            sessions: sessions.map(s => ({
-                                id: s.id,
-                                device: s.deviceInfo,
-                                ip: s.ipAddress,
-                                createdAt: s.createdAt,
-                            })),
-                        },
-                        { status: 403 }
-                    )
+                    // Auto-disconnect: Remove sessões anteriores para permitir a nova
+                    console.log(`[Session] Auto-disconnecting older sessions for ${user.id}`)
+                    await prisma.userSession.deleteMany({
+                        where: { userId: user.id }
+                    })
                 }
 
                 // Cria nova sessão
