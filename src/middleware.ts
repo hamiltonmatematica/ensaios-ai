@@ -9,6 +9,7 @@ const publicRoutes = [
     '/email-confirmado',
     '/auth/callback',
     '/support',
+    '/portfolio', // Página pública de portfólio
     '/api/auth',
     '/_next',
     '/favicon.ico',
