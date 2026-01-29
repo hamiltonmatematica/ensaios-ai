@@ -79,9 +79,9 @@ export const authOptions: NextAuthOptions = {
                                     email: user.email,
                                     name: user.name || "",
                                     image: user.image || "",
-                                    credits: 3,
+                                    credits: 40,
                                     creditBalance: {
-                                        create: { totalCredits: 3 }
+                                        create: { totalCredits: 40 }
                                     }
                                 }
                             })

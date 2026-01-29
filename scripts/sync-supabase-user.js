@@ -33,11 +33,11 @@ async function syncSupabaseUsers() {
                     id: user.id,
                     email: user.email,
                     name: user.user_metadata?.name || user.email.split('@')[0],
-                    role: 'ADMIN',
+                    role: 'USER',
                     emailVerified: user.email_confirmed_at ? new Date(user.email_confirmed_at) : null,
                     creditBalance: {
                         create: {
-                            totalCredits: 10000  // ← Campo correto!
+                            totalCredits: 40  // ← 40 créditos para novos usuários
                         }
                     }
                 },
