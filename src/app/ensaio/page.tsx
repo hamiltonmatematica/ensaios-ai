@@ -59,12 +59,14 @@ export default function EnsaioPage() {
 
     // State
     const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
-    const [selectedModel, setSelectedModel] = useState<PhotoModel | null>(null)
+    // CHANGED: Support multiple selected models
+    const [selectedModels, setSelectedModels] = useState<PhotoModel[]>([])
     const [selectedRatioId, setSelectedRatioId] = useState<string>("3:4")
     const [selectedContext, setSelectedContext] = useState("professional")
     const [selectedTier, setSelectedTier] = useState("enhanced")
     const [isPricingOpen, setIsPricingOpen] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
+    const [progress, setProgress] = useState<string | null>(null) // Progress text
     const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([])
     const [error, setError] = useState<string | null>(null)
 
@@ -84,12 +86,13 @@ export default function EnsaioPage() {
             return
         }
 
-        if (!selectedModel) {
-            setError("Selecione um modelo para o seu ensaio.")
+        if (selectedModels.length === 0) {
+            setError("Selecione pelo menos um modelo para o seu ensaio.")
             return
         }
 
-        if ((credits ?? 0) < totalCredits) {
+        const requiredCredits = totalCredits * selectedModels.length
+        if ((credits ?? 0) < requiredCredits) {
             setIsPricingOpen(true)
             return
         }
@@ -97,53 +100,67 @@ export default function EnsaioPage() {
         setIsGenerating(true)
 
         try {
+            // Prepare reference images once
             const referenceImages = await Promise.all(
                 uploadedFiles.map(file => fileToBase64(file))
             )
-
             const contextPrompt = CONTEXTS.find(c => c.id === selectedContext)?.prompt || ""
 
-            const res = await fetch("/api/generate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    modelId: selectedModel.id,
+            // Process queue sequentially
+            for (let i = 0; i < selectedModels.length; i++) {
+                const model = selectedModels[i]
+                setProgress(`Gerando ${i + 1} de ${selectedModels.length}...`)
+
+                const res = await fetch("/api/generate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        modelId: model.id,
+                        aspectRatio: selectedRatioId,
+                        referenceImages,
+                        context: selectedContext,
+                        contextPrompt,
+                        tier: selectedTier,
+                    }),
+                })
+
+                const data = await res.json()
+
+                if (!res.ok) {
+                    throw new Error(data.error || `Erro ao gerar modelo ${model.name}`)
+                }
+
+                const newImage: GeneratedImage = {
+                    id: data.generationId,
+                    url: data.imageUrl,
+                    modelId: model.id,
+                    modelName: model.name,
                     aspectRatio: selectedRatioId,
-                    referenceImages,
-                    context: selectedContext,
-                    contextPrompt,
-                    tier: selectedTier,
-                }),
-            })
+                    createdAt: new Date(),
+                }
 
-            const data = await res.json()
+                // Add to gallery immediately after generation
+                setGeneratedImages(prev => [newImage, ...prev])
 
-            if (!res.ok) {
-                throw new Error(data.error || "Erro ao gerar imagem")
+                // Refresh credits after each generation
+                await refreshCredits()
             }
 
-            const newImage: GeneratedImage = {
-                id: data.generationId,
-                url: data.imageUrl,
-                modelId: selectedModel.id,
-                modelName: selectedModel.name,
-                aspectRatio: selectedRatioId,
-                createdAt: new Date(),
-            }
-            setGeneratedImages(prev => [newImage, ...prev])
-
-            await refreshCredits()
-
+            // Scroll to gallery
             setTimeout(() => {
                 const galleryElement = document.getElementById("results-gallery")
                 if (galleryElement) galleryElement.scrollIntoView({ behavior: "smooth" })
             }, 100)
+
+            // Clear selection after success? Maybe keep it for convenience.
+            // setSelectedModels([]) 
 
         } catch (e: unknown) {
             const errorMessage = e instanceof Error ? e.message : "Erro ao gerar imagem. Tente novamente."
             setError(errorMessage)
         } finally {
             setIsGenerating(false)
+            setProgress(null)
         }
     }
 
@@ -268,8 +285,18 @@ export default function EnsaioPage() {
 
                         {/* Model Gallery */}
                         <ModelGallery
-                            selectedModelId={selectedModel?.id || null}
-                            onSelectModel={setSelectedModel}
+                            // We now use selectedModelIds for multi-selection
+                            selectedModelIds={selectedModels.map(m => m.id)}
+                            onToggleModel={(model: PhotoModel) => {
+                                setSelectedModels(prev => {
+                                    const exists = prev.find(m => m.id === model.id)
+                                    if (exists) {
+                                        return prev.filter(m => m.id !== model.id)
+                                    } else {
+                                        return [...prev, model]
+                                    }
+                                })
+                            }}
                         />
 
                         {/* Error */}
@@ -283,16 +310,16 @@ export default function EnsaioPage() {
                         <div className="sticky bottom-6 z-40 bg-zinc-900/95 backdrop-blur-lg border border-zinc-800 p-4 rounded-2xl shadow-2xl">
                             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                                 <div className="text-sm text-zinc-400">
-                                    <p>Modelo: <span className="text-white font-medium">{selectedModel?.name || "Nenhum"}</span></p>
-                                    <p>Custo: <span className="text-yellow-400 font-bold">{totalCredits} créditos</span> | Saldo: {credits ?? 0}</p>
+                                    <p>Selecionado: <span className="text-white font-medium">{selectedModels.length} modelo(s)</span></p>
+                                    <p>Custo Total: <span className="text-yellow-400 font-bold">{totalCredits * selectedModels.length} créditos</span> | Saldo: {credits ?? 0}</p>
                                 </div>
 
                                 <button
                                     onClick={handleGenerate}
-                                    disabled={isGenerating}
+                                    disabled={isGenerating || selectedModels.length === 0}
                                     className={`
                                         w-full sm:w-auto px-8 py-3 rounded-xl font-bold text-zinc-900 transition-all flex items-center justify-center gap-2
-                                        ${isGenerating
+                                        ${isGenerating || selectedModels.length === 0
                                             ? 'bg-zinc-700 cursor-wait text-zinc-400'
                                             : 'bg-gradient-to-r from-yellow-400 to-orange-500 hover:brightness-110 shadow-lg shadow-yellow-500/20'
                                         }
@@ -301,12 +328,12 @@ export default function EnsaioPage() {
                                     {isGenerating ? (
                                         <>
                                             <Loader2 className="w-5 h-5 animate-spin" />
-                                            Gerando...
+                                            {progress ? progress : "Gerando..."}
                                         </>
                                     ) : (
                                         <>
                                             <Sparkles className="w-5 h-5" />
-                                            Gerar Ensaio
+                                            Gerar {selectedModels.length > 1 ? `(${selectedModels.length})` : "Ensaio"}
                                         </>
                                     )}
                                 </button>

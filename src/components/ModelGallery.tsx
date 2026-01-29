@@ -21,7 +21,7 @@ interface ModelGalleryProps {
     onSelectModel: (model: PhotoModel) => void
 }
 
-export default function ModelGallery({ selectedModelId, onSelectModel }: ModelGalleryProps) {
+export default function ModelGallery({ selectedModelId, onSelectModel, selectedModelIds, onToggleModel }: any) {
     const { credits } = useAuth()
     const [models, setModels] = useState<ModelWithTags[]>([])
     const [allTags, setAllTags] = useState<Tag[]>([])
@@ -34,6 +34,7 @@ export default function ModelGallery({ selectedModelId, onSelectModel }: ModelGa
     useEffect(() => {
         async function fetchModels() {
             try {
+                // Models come sorted by displayOrder
                 const res = await fetch("/api/models")
                 const data = await res.json()
                 setModels(data.models || [])
@@ -55,7 +56,6 @@ export default function ModelGallery({ selectedModelId, onSelectModel }: ModelGa
         )
 
     function toggleTag(tagId: string) {
-        // Lógica de "Radio Button": se clicar no já selecionado, desmarca. Se clicar em outro, troca.
         setSelectedTags(prev =>
             prev.includes(tagId)
                 ? [] // Desmarca se já estava selecionado
@@ -66,7 +66,7 @@ export default function ModelGallery({ selectedModelId, onSelectModel }: ModelGa
     if (loading) {
         return (
             <div className="w-full mb-8">
-                <h2 className="text-xl font-semibold text-white mb-2">3. Escolha o Modelo de Ensaio</h2>
+                <h2 className="text-xl font-semibold text-white mb-2">3. Escolha os Modelos de Ensaio</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                     {[1, 2, 3].map((i) => (
                         <div key={i} className="aspect-square bg-zinc-800 animate-pulse rounded-xl" />
@@ -78,9 +78,11 @@ export default function ModelGallery({ selectedModelId, onSelectModel }: ModelGa
 
     return (
         <div className="w-full mb-8">
-            <h2 className="text-xl font-semibold text-white mb-2">3. Escolha o Modelo de Ensaio</h2>
+            <h2 className="text-xl font-semibold text-white mb-2">3. Escolha os Modelos de Ensaio</h2>
             <p className="text-zinc-400 text-sm mb-4">
-                Selecione o estilo da sua foto. Alguns modelos requerem créditos.
+                Selecione um ou mais estilos para suas fotos.
+                <br />
+                <span className="text-yellow-500 text-xs">Dica: Selecione múltiplos modelos para gerar vários ensaios em sequência.</span>
             </p>
 
             {/* Filtro por tags */}
@@ -114,12 +116,26 @@ export default function ModelGallery({ selectedModelId, onSelectModel }: ModelGa
             <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                 {filteredModels.map((model) => {
                     const isLocked = model.isPremium && !hasCredits && model.creditsRequired > 0
-                    const isSelected = selectedModelId === model.id
+
+                    // Support legacy single selection prop or new multi selection
+                    const isSelected = selectedModelIds
+                        ? selectedModelIds.includes(model.id)
+                        : selectedModelId === model.id
+
+                    // Calculate index based on ORIGINAL full list for stability
+                    const modelIndex = models.findIndex(m => m.id === model.id) + 1
 
                     return (
                         <div
                             key={model.id}
-                            onClick={() => !isLocked && onSelectModel(model)}
+                            onClick={() => {
+                                if (isLocked) return;
+                                if (onToggleModel) {
+                                    onToggleModel(model);
+                                } else if (onSelectModel) {
+                                    onSelectModel(model);
+                                }
+                            }}
                             className={`
                 relative group cursor-pointer rounded-xl overflow-hidden border-2 transition-all duration-200
                 ${isSelected ? 'border-yellow-500 scale-[1.02] shadow-lg shadow-yellow-500/20' : 'border-transparent hover:border-zinc-700'}
@@ -127,6 +143,11 @@ export default function ModelGallery({ selectedModelId, onSelectModel }: ModelGa
               `}
                         >
                             <div className="aspect-square bg-zinc-800 relative">
+                                {/* Number Badge (Top Left) */}
+                                <div className="absolute top-2 left-2 z-10 flex items-center justify-center w-8 h-8 bg-black/60 backdrop-blur-md text-white font-mono font-bold text-sm rounded-lg border border-white/10">
+                                    #{modelIndex}
+                                </div>
+
                                 <img
                                     src={model.thumbnailUrl}
                                     alt={model.name}
@@ -149,8 +170,8 @@ export default function ModelGallery({ selectedModelId, onSelectModel }: ModelGa
                                     )}
                                 </div>
 
-                                {/* Badges */}
-                                <div className="absolute top-2 right-2">
+                                {/* Badges (Top Right) */}
+                                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                                     {model.creditsRequired === 0 ? (
                                         <span className="bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
                                             Grátis
@@ -160,15 +181,19 @@ export default function ModelGallery({ selectedModelId, onSelectModel }: ModelGa
                                             Premium
                                         </span>
                                     )}
+
+                                    {isSelected && (
+                                        <span className="bg-yellow-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full uppercase shadow-lg">
+                                            Selecionado
+                                        </span>
+                                    )}
                                 </div>
 
                                 {/* Locked Overlay */}
-                                {isLocked && (
-                                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-center p-2 backdrop-blur-[2px]">
-                                        <Lock className="w-6 h-6 text-zinc-400 mb-2" />
-                                        <span className="text-xs font-bold text-white">Créditos Necessários</span>
-                                    </div>
-                                )}
+                                <div className={`absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-center p-2 backdrop-blur-[2px] transition-opacity duration-200 ${isLocked ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                                    <Lock className="w-6 h-6 text-zinc-400 mb-2" />
+                                    <span className="text-xs font-bold text-white">Créditos Necessários</span>
+                                </div>
                             </div>
                         </div>
                     )
