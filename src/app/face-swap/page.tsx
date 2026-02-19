@@ -22,8 +22,11 @@ import {
 } from "lucide-react"
 import Header from "@/components/Header"
 import PricingModal from "@/components/PricingModal"
-import heic2any from "heic2any"
+import dynamic from "next/dynamic"
 import { compressImage } from "@/lib/base64"
+
+// heic2any acessa `window` no import, precisa ser importado dinamicamente
+const importHeic2any = () => import("heic2any").then(m => m.default)
 
 
 interface FaceSwapResult {
@@ -114,6 +117,7 @@ export default function FaceSwapPage() {
         // Suporte a HEIC
         if (file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif") || file.type === "image/heic") {
             try {
+                const heic2any = await importHeic2any()
                 const blob = await heic2any({
                     blob: file,
                     toType: "image/jpeg",
@@ -148,6 +152,7 @@ export default function FaceSwapPage() {
         // Suporte a HEIC
         if (file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif") || file.type === "image/heic") {
             try {
+                const heic2any = await importHeic2any()
                 const blob = await heic2any({
                     blob: file,
                     toType: "image/jpeg",
