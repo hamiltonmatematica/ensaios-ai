@@ -10,7 +10,7 @@ import AspectRatioSelector from "@/components/AspectRatioSelector"
 import ModelGallery from "@/components/ModelGallery"
 import PricingModal from "@/components/PricingModal"
 import { PhotoModel, GeneratedImage } from "@/types"
-import { fileToBase64 } from "@/lib/nanoBanana"
+import { fileToBase64 } from "@/lib/base64"
 
 // Contextos disponíveis
 const CONTEXTS = [

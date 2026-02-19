@@ -1,7 +1,9 @@
+'use server';
+
 import { callFalAi } from "./fal"
 
 // Mapeamento de aspect ratios do frontend para Fal.ai (Flux)
-import { GoogleGenerativeAI } from "@google-generative-ai"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 
 const genAI = new GoogleGenerativeAI(process.env.NANO_BANANA_API_KEY || process.env.GEMINI_API_KEY || '')
 
@@ -127,12 +129,3 @@ export async function generatePhotoshootImage({
     }
 }
 
-// Função auxiliar para converter File para base64 (client-side)
-export function fileToBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.readAsDataURL(file)
-        reader.onload = () => resolve(reader.result as string)
-        reader.onerror = (error) => reject(error)
-    })
-}
