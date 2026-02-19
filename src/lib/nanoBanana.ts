@@ -1,5 +1,3 @@
-'use server';
-
 import { callFalAi } from "./fal"
 
 // Mapeamento de aspect ratios do frontend para Fal.ai (Flux)
@@ -37,7 +35,8 @@ export async function generatePhotoshootImage({
     promptTemplate,
     aspectRatio,
 }: GenerationParams) {
-    console.log(`[NanoBanana] Iniciando geração (Primary: Google) com aspect ratio: ${aspectRatio}`)
+    console.log(`[NanoBanana] generatePhotoshootImage called with ${referenceImages.length} images`)
+    console.log(`[NanoBanana] Aspect Ratio: ${aspectRatio}`)
 
     const model = genAI.getGenerativeModel({ model: "models/nano-banana-pro-preview" })
 

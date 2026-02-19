@@ -22,6 +22,8 @@ import {
 } from "lucide-react"
 import Header from "@/components/Header"
 import PricingModal from "@/components/PricingModal"
+import heic2any from "heic2any"
+import { compressImage } from "@/lib/base64"
 
 
 interface FaceSwapResult {
@@ -75,7 +77,9 @@ export default function FaceSwapPage() {
     const validateImage = (file: File): Promise<{ valid: boolean; error?: string }> => {
         return new Promise((resolve) => {
             // Verifica formato
-            if (!["image/jpeg", "image/png", "image/jpg"].includes(file.type)) {
+            const isHeic = file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif") || file.type === "image/heic"
+
+            if (!["image/jpeg", "image/png", "image/jpg"].includes(file.type) && !isHeic) {
                 resolve({ valid: false, error: "❌ Use apenas JPG ou PNG" })
                 return
             }
@@ -96,56 +100,34 @@ export default function FaceSwapPage() {
         })
     }
 
-    const compressImage = (file: File, maxWidth: number = 1024, quality: number = 0.85): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader()
-            reader.readAsDataURL(file)
-            reader.onload = (e) => {
-                const img = new Image()
-                img.onload = () => {
-                    // Calcula novas dimensões mantendo aspect ratio
-                    let width = img.width
-                    let height = img.height
-
-                    if (width > maxWidth) {
-                        height = (height * maxWidth) / width
-                        width = maxWidth
-                    }
-
-                    // Cria canvas para redimensionar
-                    const canvas = document.createElement('canvas')
-                    canvas.width = width
-                    canvas.height = height
-
-                    const ctx = canvas.getContext('2d')
-                    if (!ctx) {
-                        reject(new Error('Canvas context error'))
-                        return
-                    }
-
-                    ctx.drawImage(img, 0, 0, width, height)
-
-                    // Converte para base64 comprimido
-                    const compressedBase64 = canvas.toDataURL('image/jpeg', quality)
-                    resolve(compressedBase64)
-                }
-                img.onerror = reject
-                img.src = e.target?.result as string
-            }
-            reader.onerror = reject
-        })
-    }
-
     const fileToBase64 = (file: File): Promise<string> => {
-        // Usa compressão para garantir que a imagem não exceda o limite
+        // Usa a função compartilhada de compressão
         return compressImage(file, 1024, 0.85)
     }
 
     const handleSourceUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
+        let file = e.target.files?.[0]
         if (!file) return
 
         setError(null)
+
+        // Suporte a HEIC
+        if (file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif") || file.type === "image/heic") {
+            try {
+                const blob = await heic2any({
+                    blob: file,
+                    toType: "image/jpeg",
+                    quality: 0.8
+                })
+                const convertedBlob = Array.isArray(blob) ? blob[0] : blob
+                file = new File([convertedBlob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: "image/jpeg" })
+            } catch (err) {
+                console.error("Erro ao converter HEIC:", err)
+                setError("Erro ao processar imagem HEIC")
+                return
+            }
+        }
+
         const validation = await validateImage(file)
         if (!validation.valid) {
             setError(validation.error || "Imagem inválida")
@@ -158,10 +140,28 @@ export default function FaceSwapPage() {
     }, [])
 
     const handleTargetUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
+        let file = e.target.files?.[0]
         if (!file) return
 
         setError(null)
+
+        // Suporte a HEIC
+        if (file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif") || file.type === "image/heic") {
+            try {
+                const blob = await heic2any({
+                    blob: file,
+                    toType: "image/jpeg",
+                    quality: 0.8
+                })
+                const convertedBlob = Array.isArray(blob) ? blob[0] : blob
+                file = new File([convertedBlob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: "image/jpeg" })
+            } catch (err) {
+                console.error("Erro ao converter HEIC:", err)
+                setError("Erro ao processar imagem HEIC")
+                return
+            }
+        }
+
         const validation = await validateImage(file)
         if (!validation.valid) {
             setError(validation.error || "Imagem inválida")

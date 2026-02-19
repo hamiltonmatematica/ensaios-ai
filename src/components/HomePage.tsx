@@ -10,7 +10,7 @@ import ModelGallery from "@/components/ModelGallery"
 import PricingModal from "@/components/PricingModal"
 import LoginModal from "@/components/LoginModal"
 import { PhotoModel, GeneratedImage } from "@/types"
-import { fileToBase64 } from "@/lib/base64"
+import { fileToBase64, compressImage } from "@/lib/base64"
 
 export default function HomePage() {
     const { data: session, update: updateSession } = useSession()
@@ -69,7 +69,7 @@ export default function HomePage() {
         try {
             // Converte arquivos para base64
             const referenceImages = await Promise.all(
-                uploadedFiles.map(file => fileToBase64(file))
+                uploadedFiles.map(file => compressImage(file, 1024, 0.85))
             )
 
             // Chama API

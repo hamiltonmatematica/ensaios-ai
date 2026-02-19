@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
         // Parse do body
         const body = await request.json()
         const { modelId, aspectRatio, referenceImages, tier = "enhanced" } = body
+        console.log(`[API Generate] POST request received. modelId: ${modelId}, tier: ${tier}, images: ${referenceImages?.length}`)
 
         // Validações
         if (!modelId || !aspectRatio || !referenceImages) {

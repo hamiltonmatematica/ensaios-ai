@@ -10,7 +10,7 @@ import AspectRatioSelector from "@/components/AspectRatioSelector"
 import ModelGallery from "@/components/ModelGallery"
 import PricingModal from "@/components/PricingModal"
 import { PhotoModel, GeneratedImage } from "@/types"
-import { fileToBase64 } from "@/lib/base64"
+import { fileToBase64, compressImage } from "@/lib/base64"
 
 // Contextos disponíveis
 const CONTEXTS = [
@@ -102,7 +102,7 @@ export default function EnsaioPage() {
         try {
             // Prepare reference images once
             const referenceImages = await Promise.all(
-                uploadedFiles.map(file => fileToBase64(file))
+                uploadedFiles.map(file => compressImage(file, 1024, 0.85))
             )
             const contextPrompt = CONTEXTS.find(c => c.id === selectedContext)?.prompt || ""
 
