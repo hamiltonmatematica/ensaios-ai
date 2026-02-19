@@ -10,7 +10,7 @@ import ModelGallery from "@/components/ModelGallery"
 import PricingModal from "@/components/PricingModal"
 import LoginModal from "@/components/LoginModal"
 import { PhotoModel, GeneratedImage } from "@/types"
-import { fileToBase64 } from "@/lib/nanoBanana"
+import { fileToBase64 } from "@/lib/base64"
 
 export default function HomePage() {
     const { data: session, update: updateSession } = useSession()
