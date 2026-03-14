@@ -1,9 +1,5 @@
 
-import {
-    Avatar,
-    AvatarFallback,
-    AvatarImage,
-} from "@/components/automator/ui/avatar"
+
 import { Button } from "@/components/automator/ui/button"
 import {
     DropdownMenu,
@@ -21,10 +17,9 @@ export function UserNav() {
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                        <AvatarImage src="/avatars/01.png" alt="@user" />
-                        <AvatarFallback>U</AvatarFallback>
-                    </Avatar>
+                    <div className="h-8 w-8 rounded-full bg-slate-800 text-white flex items-center justify-center font-medium text-xs">
+                        U
+                    </div>
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" forceMount>

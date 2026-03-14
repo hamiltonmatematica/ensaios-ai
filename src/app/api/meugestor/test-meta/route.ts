@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAdAccountData, getCampaignsInsights, getDailyInsights } from '@/lib/facebook';
+import { getAccountInsights, getCampaignsInsights, getDailyInsights } from '@/lib/facebook';
 
 export async function GET() {
     try {
@@ -22,12 +22,11 @@ export async function GET() {
         }
 
         // Busca dados da conta
-        const accountData = await getAdAccountData(adAccountId, accessToken);
+        const accountData = await getAccountInsights(adAccountId, accessToken);
 
-        // Se houver um erro de autenticação ou conta inválida na primeira chamada, já retorna
-        if (accountData.error) {
+        if (!accountData) {
             return NextResponse.json(
-                { success: false, error: accountData.error },
+                { success: false, error: "Conta não encontrada ou sem dados." },
                 { status: 400 }
             );
         }
