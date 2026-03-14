@@ -2,7 +2,6 @@
 
 import { useRef } from "react"
 import { Upload, X } from "lucide-react"
-import heic2any from "heic2any"
 import { toast } from "react-hot-toast"
 
 interface UploadSectionProps {
@@ -78,6 +77,7 @@ export default function UploadSection({ files, onFilesChange }: UploadSectionPro
                 selectedFiles.map(async (file) => {
                     if (file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif") || file.type === "image/heic") {
                         try {
+                            const heic2any = (await import("heic2any")).default;
                             const blob = await heic2any({
                                 blob: file,
                                 toType: "image/jpeg",

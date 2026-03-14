@@ -16,9 +16,6 @@ import {
 } from "lucide-react"
 import Header from "@/components/Header"
 import PricingModal from "@/components/PricingModal"
-import heic2any from "heic2any"
-
-
 const SCALE_OPTIONS = [
     { id: "2x", label: "2x", credits: 10, description: "Dobra a resolução" },
     { id: "4x", label: "4x", credits: 20, description: "Quadruplica a resolução", recommended: true },
@@ -90,6 +87,7 @@ export default function UpscaleImagePage() {
         if (currentFile.name.toLowerCase().endsWith(".heic") || currentFile.name.toLowerCase().endsWith(".heif") || currentFile.type === "image/heic") {
             const loadingToast = typeof window !== 'undefined' ? (await import('react-hot-toast')).toast.loading("Convertendo HEIC...") : null
             try {
+                const heic2any = (await import("heic2any")).default;
                 const blob = await heic2any({
                     blob: currentFile,
                     toType: "image/jpeg",
