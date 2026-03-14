@@ -18,6 +18,54 @@ export interface RunpodStatusResponse {
 }
 
 /**
+ * Call a RunPod serverless endpoint synchronously
+ * @param endpointId - The RunPod endpoint ID
+ * @param input - The input payload for the endpoint
+ * @returns The result of the execution
+ */
+export async function callRunpodSync(
+    endpointId: string,
+    input: Record<string, unknown>
+): Promise<any> {
+    const apiKey = process.env.RUNPOD_API_KEY
+
+    if (!apiKey) {
+        throw new Error("RUNPOD_API_KEY not configured")
+    }
+
+    if (!endpointId) {
+        throw new Error("RunPod endpoint ID not provided")
+    }
+
+    const url = `${RUNPOD_API_URL}/${endpointId}/runsync`
+
+    try {
+        const res = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({ input }),
+        })
+
+        if (!res.ok) {
+            const text = await res.text()
+            console.error(`RunPod API error (${res.status}):`, text)
+            throw new Error("RUNPOD_REQUEST_FAILED")
+        }
+
+        return await res.json()
+    } catch (error) {
+        if (error instanceof Error && error.message.startsWith("RUNPOD_")) {
+            throw error
+        }
+        console.error("RunPod request failed:", error)
+        throw new Error("RUNPOD_REQUEST_FAILED")
+    }
+}
+
+/**
  * Call a RunPod serverless endpoint
  * @param endpointId - The RunPod endpoint ID
  * @param input - The input payload for the endpoint

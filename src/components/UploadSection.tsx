@@ -2,6 +2,8 @@
 
 import { useRef } from "react"
 import { Upload, X } from "lucide-react"
+import heic2any from "heic2any"
+import { toast } from "react-hot-toast"
 
 interface UploadSectionProps {
     files: File[]
@@ -69,11 +71,35 @@ export default function UploadSection({ files, onFilesChange }: UploadSectionPro
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            const newFiles = Array.from(e.target.files)
+            let selectedFiles = Array.from(e.target.files)
+
+            // Suporte a HEIC
+            const processedFiles = await Promise.all(
+                selectedFiles.map(async (file) => {
+                    if (file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif") || file.type === "image/heic") {
+                        try {
+                            const blob = await heic2any({
+                                blob: file,
+                                toType: "image/jpeg",
+                                quality: 0.8
+                            })
+                            const convertedBlob = Array.isArray(blob) ? blob[0] : blob
+                            return new File([convertedBlob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: "image/jpeg" })
+                        } catch (err) {
+                            console.error("Erro ao converter HEIC no UploadSection:", err)
+                            toast.error(`Erro ao converter ${file.name}`)
+                            return null
+                        }
+                    }
+                    return file
+                })
+            )
+
+            const validFiles = processedFiles.filter((f): f is File => f !== null)
 
             // Comprime cada imagem
             const compressedFiles = await Promise.all(
-                newFiles.map(file => compressImage(file))
+                validFiles.map(file => compressImage(file))
             )
 
             // Limita a 3 arquivos no total

@@ -11,7 +11,7 @@ import {
     Loader2,
     ImagePlus,
     Clock,
-    History
+    History,
 } from "lucide-react"
 import DashboardCard from "@/components/DashboardCard"
 import Header from "@/components/Header"
@@ -183,6 +183,7 @@ export default function DashboardPage() {
                             credits={10}
                             isNew
                         />
+
                     </div>
                 </div>
             </main>

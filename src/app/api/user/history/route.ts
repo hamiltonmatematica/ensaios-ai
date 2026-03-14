@@ -95,6 +95,7 @@ export async function GET(request: NextRequest) {
             }))
         }
 
+
         return NextResponse.json({ items })
 
     } catch (error) {
@@ -147,6 +148,7 @@ export async function DELETE(request: NextRequest) {
                 where: { id: id, userId: user.id }
             })
         }
+
 
         return NextResponse.json({ success: true })
 

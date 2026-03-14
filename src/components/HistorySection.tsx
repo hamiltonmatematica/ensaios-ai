@@ -10,7 +10,7 @@ import {
     Calendar,
     Download,
     ExternalLink,
-    Trash2
+    Trash2,
 } from "lucide-react"
 
 type HistoryItem = {
@@ -28,6 +28,7 @@ const TABS = [
     { id: "face-swap", label: "Face Swap", icon: Sparkles },
     { id: "upscale", label: "Upscale", icon: ImageIcon },
 ]
+
 
 export default function HistorySection() {
     const [activeTab, setActiveTab] = useState("generations")

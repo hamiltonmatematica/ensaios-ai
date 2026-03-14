@@ -36,5 +36,6 @@ export const FEATURE_COSTS = {
     UPSCALE_IMAGEM: 10,
     INPAINT: 15,
     VIRTUAL_TRY_ON: 20,
-    TEXT_TO_SPEECH: 1 // por caractere ou bloco, a definir. Deixamos 1 crédito base por enquanto
+    TEXT_TO_SPEECH: 1, // por caractere ou bloco, a definir
+    AVATAR_VIDEO: 20 // 20 créditos por vídeo (comparável a try-on/render)
 }

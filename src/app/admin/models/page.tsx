@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Trash2, Loader2, Edit, X, Check, Image as ImageIcon } from "lucide-react"
+import { Plus, Trash2, Loader2, Edit, X, Check, Image as ImageIcon, Upload } from "lucide-react"
 
 interface Tag {
     id: string
@@ -33,6 +33,8 @@ export default function ModelsPage() {
     const [showForm, setShowForm] = useState(false)
     const [saving, setSaving] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
+    const [uploading, setUploading] = useState(false)
+    const fileInputRef = React.useRef<HTMLInputElement>(null)
 
     // Form state
     const [form, setForm] = useState({
@@ -102,6 +104,47 @@ export default function ModelsPage() {
         })
         setEditingId(model.id)
         setShowForm(true)
+    }
+
+    async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        if (!file.type.startsWith('image/')) {
+            alert('Por favor, selecione uma imagem válida.')
+            return
+        }
+
+        setUploading(true)
+
+        try {
+            const reader = new FileReader()
+            reader.readAsDataURL(file)
+
+            reader.onload = async () => {
+                const base64Data = reader.result as string
+                const response = await fetch('/api/admin/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        base64Data: base64Data,
+                        fileName: `model-${Date.now()}`
+                    })
+                })
+
+                if (response.ok) {
+                    const data = await response.json()
+                    setForm(prev => ({ ...prev, thumbnailUrl: data.url }))
+                } else {
+                    alert('Erro ao fazer upload da imagem')
+                }
+                setUploading(false)
+            }
+        } catch (error) {
+            console.error('Erro no upload:', error)
+            alert('Erro ao processar imagem')
+            setUploading(false)
+        }
     }
 
     async function saveModel() {
@@ -220,23 +263,65 @@ export default function ModelsPage() {
                                 />
                             </div>
 
-                            {/* Thumbnail URL */}
+                            {/* Thumbnail */}
                             <div>
                                 <label className="block text-sm font-medium text-zinc-300 mb-2">
-                                    URL da Foto Modelo *
+                                    Foto do Modelo *
                                 </label>
-                                <input
-                                    type="url"
-                                    value={form.thumbnailUrl}
-                                    onChange={(e) => setForm(prev => ({ ...prev, thumbnailUrl: e.target.value }))}
-                                    placeholder="https://exemplo.com/foto.jpg"
-                                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-yellow-500"
-                                />
-                                {form.thumbnailUrl && (
-                                    <div className="mt-2 relative w-32 h-32 rounded-lg overflow-hidden bg-zinc-800">
-                                        <img src={form.thumbnailUrl} alt="Preview" className="w-full h-full object-cover" />
+
+                                <div className="flex items-start gap-4">
+                                    {form.thumbnailUrl ? (
+                                        <div className="relative w-32 h-32 rounded-lg overflow-hidden bg-zinc-800 border-2 border-zinc-700 flex-shrink-0 group">
+                                            <img src={form.thumbnailUrl} alt="Preview" className="w-full h-full object-cover" />
+                                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                <button
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    className="p-2 bg-yellow-500 rounded-full text-black hover:bg-yellow-400 transition-colors"
+                                                    title="Trocar foto"
+                                                >
+                                                    <Edit className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => fileInputRef.current?.click()}
+                                            disabled={uploading}
+                                            className="w-32 h-32 rounded-lg border-2 border-dashed border-zinc-700 flex flex-col items-center justify-center gap-2 text-zinc-500 hover:text-yellow-500 hover:border-yellow-500 hover:bg-zinc-800/50 transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {uploading ? (
+                                                <Loader2 className="w-6 h-6 animate-spin" />
+                                            ) : (
+                                                <>
+                                                    <Upload className="w-6 h-6" />
+                                                    <span className="text-xs font-medium">Fazer Upload</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    )}
+
+                                    <div className="flex-1 space-y-2">
+                                        <input
+                                            type="url"
+                                            value={form.thumbnailUrl}
+                                            onChange={(e) => setForm(prev => ({ ...prev, thumbnailUrl: e.target.value }))}
+                                            placeholder="Ou cole a URL da imagem aqui"
+                                            className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-yellow-500 text-sm"
+                                        />
+                                        <p className="text-xs text-zinc-500">
+                                            Recomendado: Imagem 4:3 (ex: 800x600px).
+                                        </p>
                                     </div>
-                                )}
+
+                                    {/* Input hidden for file upload */}
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleImageUpload}
+                                        accept="image/jpeg,image/png,image/webp"
+                                        className="hidden"
+                                    />
+                                </div>
                             </div>
 
                             {/* Prompt */}

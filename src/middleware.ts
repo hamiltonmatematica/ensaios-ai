@@ -13,6 +13,8 @@ const publicRoutes = [
     '/api/auth',
     '/_next',
     '/favicon.ico',
+    '/meugestor', // Liberando rotas do meu gestor
+    '/api/meugestor', // Liberando API do meu gestor
 ]
 
 export async function middleware(request: NextRequest) {

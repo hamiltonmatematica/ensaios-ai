@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase-client"
 import { useRouter } from "next/navigation"
-import { Coins, LogOut, User, Menu, X, Camera, MessageCircle, Calendar, Settings } from "lucide-react"
+import { Coins, LogOut, User, Menu, X, Camera, MessageCircle, Calendar, Settings, Video } from "lucide-react"
 
 interface HeaderProps {
     onOpenPricing: () => void
@@ -95,6 +95,11 @@ export default function Header({ onOpenPricing, onOpenLogin }: HeaderProps) {
                                 Dashboard
                             </a>
 
+                            <a href="/automator" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors flex items-center gap-1">
+                                <Video className="w-4 h-4" />
+                                Automator
+                            </a>
+
                             <a href="/history" className="text-sm font-medium text-zinc-300 hover:text-white transition-colors">
                                 Histórico
                             </a>
@@ -168,6 +173,14 @@ export default function Header({ onOpenPricing, onOpenLogin }: HeaderProps) {
                             >
                                 <Camera className="w-5 h-5" />
                                 Dashboard
+                            </a>
+
+                            <a
+                                href="/automator"
+                                className="flex items-center gap-3 px-4 py-3 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+                            >
+                                <Video className="w-5 h-5" />
+                                Automator
                             </a>
 
                             {user?.user_metadata?.role === "ADMIN" || user?.role === "ADMIN" ? (

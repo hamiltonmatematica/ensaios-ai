@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import Header from "@/components/Header"
 import PricingModal from "@/components/PricingModal"
+import heic2any from "heic2any"
 
 
 const SCALE_OPTIONS = [
@@ -83,21 +84,43 @@ export default function UpscaleImagePage() {
     }
 
     const handleImageUpload = useCallback(async (file: File) => {
-        if (!file.type.startsWith("image/")) {
+        let currentFile = file
+
+        // Suporte a HEIC
+        if (currentFile.name.toLowerCase().endsWith(".heic") || currentFile.name.toLowerCase().endsWith(".heif") || currentFile.type === "image/heic") {
+            const loadingToast = typeof window !== 'undefined' ? (await import('react-hot-toast')).toast.loading("Convertendo HEIC...") : null
+            try {
+                const blob = await heic2any({
+                    blob: currentFile,
+                    toType: "image/jpeg",
+                    quality: 0.8
+                })
+                const convertedBlob = Array.isArray(blob) ? blob[0] : blob
+                currentFile = new File([convertedBlob], currentFile.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: "image/jpeg" })
+                if (loadingToast) (await import('react-hot-toast')).toast.dismiss(loadingToast)
+            } catch (err) {
+                console.error("Erro ao converter HEIC:", err)
+                setError("Erro ao processar imagem HEIC")
+                if (loadingToast) (await import('react-hot-toast')).toast.dismiss(loadingToast)
+                return
+            }
+        }
+
+        if (!currentFile.type.startsWith("image/")) {
             setError("Por favor, envie apenas imagens")
             return
         }
 
-        if (file.size > 10 * 1024 * 1024) {
-            setError("Imagem muito grande. Máximo 10MB")
+        if (currentFile.size > 15 * 1024 * 1024) { // Aumentado um pouco o limite para HEIC convertidos
+            setError("Imagem muito grande. Máximo 15MB")
             return
         }
 
-        setImageFile(file)
+        setImageFile(currentFile)
 
         try {
             // Redimensiona se necessário antes de setar
-            const resizedBase64 = await resizeImage(file)
+            const resizedBase64 = await resizeImage(currentFile)
             setImage(resizedBase64)
             setError(null)
         } catch (e) {

@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Otimizações de performance
   images: {
     formats: ['image/webp', 'image/avif'],
     minimumCacheTTL: 60,
