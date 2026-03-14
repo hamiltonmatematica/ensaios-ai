@@ -50,8 +50,8 @@ export async function getAllAdAccounts(accessToken: string): Promise<MetaAccount
     let url: string | null = `${FB_GRAPH_URL}/me/adaccounts?fields=name,account_id,currency,account_status,amount_spent&limit=100&access_token=${accessToken}`;
 
     while (url) {
-        const response = await fetch(url);
-        const data = await response.json();
+        const res: Response = await fetch(url as string);
+        const data: any = await res.json();
         if (data.error) throw new Error(data.error.message);
         if (data.data) allAccounts.push(...data.data);
         url = data.paging?.next || null;
@@ -71,8 +71,8 @@ export async function getCampaignsInsights(adAccountId: string, accessToken: str
         `limit=500&` +
         `access_token=${accessToken}`;
 
-    const response = await fetch(url);
-    const data = await response.json();
+    const res: Response = await fetch(url);
+    const data: any = await res.json();
     if (data.error) return [];
     return data.data || [];
 }
@@ -86,8 +86,8 @@ export async function getAccountInsights(adAccountId: string, accessToken: strin
         `fields=spend,impressions,clicks,ctr,cpc,reach,frequency,actions&` +
         `access_token=${accessToken}`;
 
-    const response = await fetch(url);
-    const data = await response.json();
+    const res: Response = await fetch(url);
+    const data: any = await res.json();
     if (data.error) return null;
     return data.data?.[0] || null;
 }
@@ -102,8 +102,8 @@ export async function getDailyInsights(adAccountId: string, accessToken: string,
         `fields=date_start,spend,impressions,clicks,reach,actions&` +
         `access_token=${accessToken}`;
 
-    const response = await fetch(url);
-    const data = await response.json();
+    const res: Response = await fetch(url);
+    const data: any = await res.json();
     if (data.error) return [];
     return data.data || [];
 }
@@ -128,8 +128,8 @@ export async function getAdsInsights(campaignId: string, accessToken: string, da
         `limit=500&` +
         `access_token=${accessToken}`;
 
-    const response = await fetch(url);
-    const data = await response.json();
+    const res: Response = await fetch(url);
+    const data: any = await res.json();
     if (data.error) return [];
     return data.data || [];
 }
