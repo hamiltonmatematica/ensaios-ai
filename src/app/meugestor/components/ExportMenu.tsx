@@ -5,11 +5,13 @@ import { Download, FileText, Brain, ChevronDown, Printer, Loader2, Check, AlertC
 interface Props {
     period: { preset?: string; since?: string; until?: string };
     accounts?: string[];
+    /** Quando definido, mostra um rótulo do escopo no menu (ex: nome da conta atual). */
+    scopeLabel?: string;
 }
 
 type Status = "idle" | "loading" | "success" | "error";
 
-export default function ExportMenu({ period, accounts }: Props) {
+export default function ExportMenu({ period, accounts, scopeLabel }: Props) {
     const [open, setOpen] = useState(false);
     const [status, setStatus] = useState<Status>("idle");
     const [errorMsg, setErrorMsg] = useState("");
@@ -101,6 +103,14 @@ export default function ExportMenu({ period, accounts }: Props) {
             )}
             {open && status !== "loading" && (
                 <div className="g-glass" style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 50, width: 290, padding: "0.5rem", background: "rgba(15,18,37,0.98)" }}>
+                    {scopeLabel && (
+                        <div style={{ padding: "0.4rem 0.6rem 0.55rem", marginBottom: "0.3rem", borderBottom: "1px solid var(--glass-border)" }}>
+                            <p style={{ fontSize: "0.6rem", color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Escopo</p>
+                            <p style={{ fontSize: "0.75rem", color: "#a78bfa", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={scopeLabel}>
+                                {scopeLabel}
+                            </p>
+                        </div>
+                    )}
                     {items.map((it, i) => {
                         const Icon = it.icon;
                         const fname = `meugestor_${it.level}_${periodTag}.${it.format}`;

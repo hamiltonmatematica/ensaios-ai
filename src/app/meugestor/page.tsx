@@ -514,7 +514,21 @@ export default function MeuGestorDashboard() {
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                         <DateRangePicker value={period} onChange={setPeriod} compare={compare} onCompareChange={setCompare} />
-                        <ExportMenu period={period} accounts={onlyFavorites || currentPage === "favorites" ? Array.from(favorites) : undefined} />
+                        <ExportMenu
+                            period={period}
+                            accounts={
+                                selectedAccountId
+                                    ? [selectedAccountId]
+                                    : onlyFavorites || currentPage === "favorites"
+                                        ? Array.from(favorites)
+                                        : undefined
+                            }
+                            scopeLabel={
+                                selectedAccountId
+                                    ? (selectedAccount?.name || "Conta atual")
+                                    : undefined
+                            }
+                        />
                         <button onClick={fetchAccounts} disabled={loading} className="g-btn-secondary"
                             style={{
                                 display: "inline-flex", alignItems: "center", gap: "0.4rem",
