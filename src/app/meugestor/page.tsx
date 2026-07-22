@@ -411,12 +411,27 @@ export default function MeuGestorDashboard() {
     }
 
     if (error) {
+        const isTokenError = error.includes("META_ACCESS_TOKEN") || error.includes("OAuth") || error.includes("token");
         return (
             <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div className="g-glass" style={{ padding: "2rem", textAlign: "center", maxWidth: 460 }}>
+                <div className="g-glass" style={{ padding: "2rem", textAlign: "center", maxWidth: 500 }}>
                     <AlertCircle style={{ width: 48, height: 48, color: "#f87171", margin: "0 auto 1rem" }} />
-                    <h3 style={{ color: "white", fontSize: "1.05rem", fontWeight: 700, marginBottom: "0.5rem" }}>Erro ao carregar</h3>
-                    <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.85rem", marginBottom: "1rem" }}>{error}</p>
+                    <h3 style={{ color: "white", fontSize: "1.1rem", fontWeight: 700, marginBottom: "0.5rem" }}>
+                        {isTokenError ? "Problema com Token da Meta API" : "Erro ao carregar dados"}
+                    </h3>
+                    <p style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.85rem", marginBottom: "1rem", lineHeight: 1.5 }}>
+                        {error}
+                    </p>
+                    {isTokenError && (
+                        <div style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 8, padding: "0.75rem", marginBottom: "1.25rem", textAlign: "left", fontSize: "0.78rem", color: "rgba(255,255,255,0.8)" }}>
+                            <strong>Como resolver:</strong>
+                            <ol style={{ paddingLeft: "1.2rem", marginTop: "0.4rem", marginBottom: 0 }}>
+                                <li>Acesse o <em>Meta Business / Graph API Explorer</em> e gere um novo <code>User Access Token</code>.</li>
+                                <li>Atualize a chave <code>META_ACCESS_TOKEN</code> no arquivo <code>.env</code>.</li>
+                                <li>Reinicie a aplicação para aplicar o novo token.</li>
+                            </ol>
+                        </div>
+                    )}
                     <button onClick={fetchAccounts} className="g-btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
                         <RefreshCw style={{ width: 16, height: 16 }} /> Tentar novamente
                     </button>

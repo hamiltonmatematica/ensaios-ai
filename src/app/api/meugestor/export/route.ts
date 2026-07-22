@@ -170,14 +170,15 @@ export async function GET(request: NextRequest) {
             },
         });
     } catch (error: any) {
-        const fbCode = error?.fb?.code;
-        const transient = fbCode === 1 || fbCode === 2 || fbCode === 4 || fbCode === 17 || fbCode === 32 || fbCode === 613;
-        const friendly = transient
-            ? `Meta API instável/limite de chamadas atingido (${error.message}). Tente novamente em 1-2 minutos, ou exporte um nível menor (Contas em vez de Anúncios) ou período mais curto.`
-            : (error?.message || 'Erro no export');
+        const isAuthError = error?.fb?.code === 190 || error?.code === 190 || error?.message?.includes('OAuth') || error?.message?.includes('access token');
+        const status = isAuthError ? 401 : (error?.status || 500);
+        const errorMsg = isAuthError
+            ? 'Token de acesso da Meta (META_ACCESS_TOKEN) está inválido ou expirado.'
+            : (error.message || 'Erro no export');
+
         return NextResponse.json(
-            { success: false, error: friendly, fb_code: fbCode ?? null },
-            { status: transient ? 503 : 500 }
+            { success: false, error: errorMsg, code: error?.fb?.code || error?.code },
+            { status }
         );
     }
 }

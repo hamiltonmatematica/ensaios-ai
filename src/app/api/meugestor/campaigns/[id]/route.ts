@@ -76,9 +76,15 @@ export async function GET(
             period: { preset, range, previous: prev },
         });
     } catch (error: any) {
+        const isAuthError = error?.fb?.code === 190 || error?.code === 190 || error?.message?.includes('OAuth') || error?.message?.includes('access token');
+        const status = isAuthError ? 401 : (error?.status || 500);
+        const errorMsg = isAuthError
+            ? 'Token de acesso da Meta (META_ACCESS_TOKEN) está inválido ou expirado.'
+            : (error.message || 'Erro ao buscar dados da campanha');
+
         return NextResponse.json(
-            { success: false, error: error.message || 'Erro ao buscar dados da campanha' },
-            { status: 500 }
+            { success: false, error: errorMsg, code: error?.fb?.code || error?.code },
+            { status }
         );
     }
 }
