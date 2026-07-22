@@ -6,6 +6,7 @@ import {
     MousePointerClick, Target, ChevronLeft,
     RefreshCw, Search, Loader2, AlertCircle, Eye, Menu, X,
     Building2, Layers, Hash, Brain, Wallet, Activity, Filter,
+    Key, Check, ExternalLink,
 } from "lucide-react";
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -29,6 +30,7 @@ import ClientReport from "./components/ClientReport";
 import CmdK, { CmdItem } from "./components/CmdK";
 import InsightsTable from "./components/InsightsTable";
 import SmartInsights from "./components/SmartInsights";
+import TokenModal from "./components/TokenModal";
 import { DEFAULT_KPIS, KpiCtx, aggregateRow } from "./lib/kpis";
 
 // ─────────────────────────────────────────────────────────────
@@ -95,6 +97,11 @@ export default function MeuGestorDashboard() {
     const [adsetKpis, setAdsetKpis] = useState<string[]>(DEFAULT_KPIS.adset);
     const [adKpis, setAdKpis] = useState<string[]>(DEFAULT_KPIS.ad);
 
+    // Token Meta Customizado
+    const [customMetaToken, setCustomMetaToken] = useState("");
+    const [tokenModalOpen, setTokenModalOpen] = useState(false);
+    const [inlineTokenInput, setInlineTokenInput] = useState("");
+
     // Modais
     const [pickerOpen, setPickerOpen] = useState<null | "account" | "campaign" | "adset" | "ad">(null);
     const [kpiPickerOpen, setKpiPickerOpen] = useState<null | KpiCtx>(null);
@@ -103,6 +110,9 @@ export default function MeuGestorDashboard() {
 
     // ── Hidrata localStorage ──
     useEffect(() => {
+        const savedToken = load<string>("custom_meta_token", "");
+        setCustomMetaToken(savedToken);
+        setInlineTokenInput(savedToken);
         setFavorites(new Set(load<string[]>(KEYS.favorites, [])));
         setAccountMetrics(load(KEYS.metricsByLevel + ":account", DEFAULT_ACCOUNT_METRICS));
         setCampaignMetrics(load(KEYS.metricsByLevel + ":campaign", DEFAULT_CAMPAIGN_METRICS));
@@ -136,6 +146,12 @@ export default function MeuGestorDashboard() {
     useEffect(() => save(KEYS.onlyFavorites, onlyFavorites), [onlyFavorites]);
     useEffect(() => save(KEYS.sidebarOpen, sidebarOpen), [sidebarOpen]);
 
+    const getApiHeaders = useCallback(() => {
+        const h: Record<string, string> = {};
+        if (customMetaToken) h["x-meta-access-token"] = customMetaToken;
+        return h;
+    }, [customMetaToken]);
+
     // ── Cmd+K shortcut ──
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
@@ -164,7 +180,10 @@ export default function MeuGestorDashboard() {
         accountsAbortRef.current = ctrl;
         setLoading(true); setError(null);
         try {
-            const res = await fetch(`/api/meugestor/accounts?${buildPeriodParams().toString()}`, { signal: ctrl.signal });
+            const res = await fetch(`/api/meugestor/accounts?${buildPeriodParams().toString()}`, {
+                headers: getApiHeaders(),
+                signal: ctrl.signal,
+            });
             const json = await res.json();
             if (!json.success) throw new Error(json.error || "Erro ao buscar contas");
             setAccounts(json.data);
@@ -174,7 +193,7 @@ export default function MeuGestorDashboard() {
         } finally {
             if (accountsAbortRef.current === ctrl) setLoading(false);
         }
-    }, [buildPeriodParams]);
+    }, [buildPeriodParams, getApiHeaders]);
 
     useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
 
@@ -186,7 +205,10 @@ export default function MeuGestorDashboard() {
         detailAbortRef.current = ctrl;
         setLoadingDetail(true);
         try {
-            const res = await fetch(`/api/meugestor/accounts/${id}?${buildPeriodParams().toString()}`, { signal: ctrl.signal });
+            const res = await fetch(`/api/meugestor/accounts/${id}?${buildPeriodParams().toString()}`, {
+                headers: getApiHeaders(),
+                signal: ctrl.signal,
+            });
             const json = await res.json();
             if (json.success) {
                 const daily = (json.data.daily || []).map((d: any) => {
@@ -200,7 +222,7 @@ export default function MeuGestorDashboard() {
         } finally {
             if (detailAbortRef.current === ctrl) setLoadingDetail(false);
         }
-    }, [buildPeriodParams]);
+    }, [buildPeriodParams, getApiHeaders]);
 
     const campaignAbortRef = useRef<AbortController | null>(null);
     const fetchCampaignDetail = useCallback(async (id: string) => {
@@ -209,7 +231,10 @@ export default function MeuGestorDashboard() {
         campaignAbortRef.current = ctrl;
         setLoadingCampaign(true);
         try {
-            const res = await fetch(`/api/meugestor/campaigns/${id}?${buildPeriodParams().toString()}`, { signal: ctrl.signal });
+            const res = await fetch(`/api/meugestor/campaigns/${id}?${buildPeriodParams().toString()}`, {
+                headers: getApiHeaders(),
+                signal: ctrl.signal,
+            });
             const json = await res.json();
             if (json.success) {
                 const daily = (json.data.daily || []).map((d: any) => {
@@ -218,6 +243,12 @@ export default function MeuGestorDashboard() {
                 });
                 setCampaignDetail({ ads: json.data.ads, daily });
             }
+        } catch (e: any) {
+            if (e.name !== "AbortError") console.error(e);
+        } finally {
+            if (campaignAbortRef.current === ctrl) setLoadingCampaign(false);
+        }
+    }, [buildPeriodParams, getApiHeaders]);
         } catch (e: any) {
             if (e.name !== "AbortError") console.error(e);
         } finally {
@@ -413,8 +444,8 @@ export default function MeuGestorDashboard() {
     if (error) {
         const isTokenError = error.includes("META_ACCESS_TOKEN") || error.includes("OAuth") || error.includes("token") || error.includes("Meta HTTP") || error.includes("500");
         return (
-            <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div className="g-glass" style={{ padding: "2rem", textAlign: "center", maxWidth: 500 }}>
+            <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+                <div className="g-glass" style={{ padding: "2rem", textAlign: "center", maxWidth: 520, width: "100%" }}>
                     <AlertCircle style={{ width: 48, height: 48, color: "#f87171", margin: "0 auto 1rem" }} />
                     <h3 style={{ color: "white", fontSize: "1.1rem", fontWeight: 700, marginBottom: "0.5rem" }}>
                         {isTokenError ? "Problema de Conexão com a Meta API" : "Erro ao carregar dados"}
@@ -423,13 +454,39 @@ export default function MeuGestorDashboard() {
                         {error}
                     </p>
                     {isTokenError && (
-                        <div style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)", borderRadius: 8, padding: "0.75rem", marginBottom: "1.25rem", textAlign: "left", fontSize: "0.78rem", color: "rgba(255,255,255,0.8)" }}>
-                            <strong>Como resolver:</strong>
-                            <ol style={{ paddingLeft: "1.2rem", marginTop: "0.4rem", marginBottom: 0 }}>
-                                <li>Acesse o <em>Meta Business / Graph API Explorer</em> e gere um novo <code>User Access Token</code>.</li>
-                                <li>Atualize a chave <code>META_ACCESS_TOKEN</code> no arquivo <code>.env</code>.</li>
-                                <li>Reinicie a aplicação (ou redeploy) para carregar as novas variáveis de ambiente.</li>
-                            </ol>
+                        <div style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 10, padding: "1rem", marginBottom: "1.25rem", textAlign: "left", fontSize: "0.78rem" }}>
+                            <p style={{ margin: "0 0 0.5rem", fontWeight: 600, color: "white" }}>Cole seu novo META_ACCESS_TOKEN abaixo:</p>
+                            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.6rem" }}>
+                                <input
+                                    type="password"
+                                    value={inlineTokenInput}
+                                    onChange={e => setInlineTokenInput(e.target.value)}
+                                    placeholder="EAAN... / EAAB..."
+                                    style={{ flex: 1, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "0.5rem 0.75rem", color: "white", fontSize: "0.78rem", outline: "none" }}
+                                />
+                                <button
+                                    onClick={() => {
+                                        const t = inlineTokenInput.trim();
+                                        setCustomMetaToken(t);
+                                        save("custom_meta_token", t);
+                                        fetchAccounts();
+                                    }}
+                                    className="g-btn-primary"
+                                    style={{ padding: "0.5rem 0.85rem", fontSize: "0.75rem", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
+                                >
+                                    <Key style={{ width: 13, height: 13 }} /> Salvar &amp; Testar
+                                </button>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer" style={{ color: "#748ffc", textDecoration: "none", fontSize: "0.72rem", display: "inline-flex", alignItems: "center", gap: "0.2rem", fontWeight: 600 }}>
+                                    Gerar novo token no Graph API Explorer <ExternalLink style={{ width: 11, height: 11 }} />
+                                </a>
+                                {customMetaToken && (
+                                    <button onClick={() => { setCustomMetaToken(""); save("custom_meta_token", ""); setInlineTokenInput(""); fetchAccounts(); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: "0.7rem", cursor: "pointer", textDecoration: "underline" }}>
+                                        Restaurar padrão (.env)
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     )}
                     <button onClick={fetchAccounts} className="g-btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
@@ -528,6 +585,16 @@ export default function MeuGestorDashboard() {
                         </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <button onClick={() => setTokenModalOpen(true)} className="g-btn-secondary"
+                            style={{
+                                display: "inline-flex", alignItems: "center", gap: "0.4rem",
+                                padding: "0.5rem 0.75rem", fontSize: "0.75rem",
+                                borderColor: customMetaToken ? "rgba(52,211,153,0.6)" : undefined,
+                                color: customMetaToken ? "#34d399" : undefined,
+                            }}>
+                            <Key style={{ width: 13, height: 13 }} />
+                            <span>{customMetaToken ? "Token Ativo" : "Token Meta"}</span>
+                        </button>
                         <DateRangePicker value={period} onChange={setPeriod} compare={compare} onCompareChange={setCompare} />
                         <ExportMenu
                             period={period}
@@ -967,6 +1034,24 @@ export default function MeuGestorDashboard() {
                 title={`KPIs — ${kpiPickerOpen === "dashboard" ? "Painel Geral" : kpiPickerOpen === "account" ? "Conta" : kpiPickerOpen === "campaign" ? "Campanha" : kpiPickerOpen === "adset" ? "Conjunto" : "Anúncio"}`}
             />
             <CmdK items={cmdItems} open={cmdkOpen} onClose={() => setCmdkOpen(false)} />
+            <TokenModal
+                open={tokenModalOpen}
+                onClose={() => setTokenModalOpen(false)}
+                currentToken={customMetaToken}
+                onSave={(t) => {
+                    const trimmed = t.trim();
+                    setCustomMetaToken(trimmed);
+                    save("custom_meta_token", trimmed);
+                    setInlineTokenInput(trimmed);
+                    fetchAccounts();
+                }}
+                onClear={() => {
+                    setCustomMetaToken("");
+                    save("custom_meta_token", "");
+                    setInlineTokenInput("");
+                    fetchAccounts();
+                }}
+            />
 
             <footer style={{ textAlign: "center", padding: "1.25rem 1rem", fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", borderTop: "1px solid var(--glass-border)", marginTop: "1.5rem" }}>
                 Hamilton gestor de tráfego e i.a

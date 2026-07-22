@@ -12,8 +12,24 @@
  *  - Toggle de status ad/campaign/adset (ACTIVE / PAUSED)
  */
 
+import { NextRequest } from 'next/server';
+
 const FB_API_VERSION = 'v22.0';
 const FB_GRAPH_URL = `https://graph.facebook.com/${FB_API_VERSION}`;
+
+/**
+ * Obtém o token de acesso da Meta priorizando:
+ * 1. Header 'x-meta-access-token' enviado pelo cliente
+ * 2. Query param '?meta_token=...'
+ * 3. Variável de ambiente process.env.META_ACCESS_TOKEN
+ */
+export function getMetaAccessToken(request: NextRequest): string | null {
+    const headerToken = request.headers.get('x-meta-access-token');
+    if (headerToken && headerToken.trim()) return headerToken.trim();
+    const queryToken = request.nextUrl?.searchParams?.get('meta_token');
+    if (queryToken && queryToken.trim()) return queryToken.trim();
+    return process.env.META_ACCESS_TOKEN || null;
+}
 
 // ─────────────────────────────────────────────────────────────
 // TIPOS

@@ -3,7 +3,7 @@ import {
     getAllAdAccounts, getAccountInsights, getCampaignsInsights, getAdsInsights, getDailyInsights,
     flattenInsight, healthScore,
     presetToRange, previousRange, deltaPct,
-    MetaDatePreset, MetaTimeRange,
+    MetaDatePreset, MetaTimeRange, getMetaAccessToken,
 } from '@/lib/facebook';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +24,7 @@ const VALID_PRESETS: MetaDatePreset[] = [
  */
 export async function GET(request: NextRequest) {
     try {
-        const accessToken = process.env.META_ACCESS_TOKEN;
+        const accessToken = getMetaAccessToken(request);
         if (!accessToken) {
             return NextResponse.json({ success: false, error: 'META_ACCESS_TOKEN não configurado' }, { status: 400 });
         }

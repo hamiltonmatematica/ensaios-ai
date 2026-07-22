@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getMetaAccessToken } from '@/lib/facebook';
 
 const FB_GRAPH_URL = 'https://graph.facebook.com/v22.0';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     try {
-        const accessToken = process.env.META_ACCESS_TOKEN;
+        const accessToken = getMetaAccessToken(request);
         if (!accessToken) {
             return NextResponse.json({ success: false, error: 'META_ACCESS_TOKEN não configurado' }, { status: 400 });
         }
