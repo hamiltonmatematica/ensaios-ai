@@ -159,10 +159,10 @@ export async function GET(request: NextRequest) {
             period: { preset, range, previous: prev },
         });
     } catch (error: any) {
-        const isAuthError = error?.fb?.code === 190 || error?.code === 190 || error?.message?.includes('OAuth') || error?.message?.includes('access token');
-        const status = isAuthError ? 401 : (error?.status || 500);
-        const errorMsg = isAuthError
-            ? 'Token de acesso da Meta (META_ACCESS_TOKEN) está inválido ou expirado. Por favor, atualize o token no arquivo .env.'
+        const isMetaError = error?.fb?.code === 190 || error?.code === 190 || error?.message?.includes('OAuth') || error?.message?.includes('access token') || error?.message?.includes('Meta HTTP');
+        const status = isMetaError ? 401 : (error?.status || 500);
+        const errorMsg = isMetaError
+            ? `Erro de comunicação com a Meta API (${error.message || 'Token expirado/inválido'}). Por favor, atualize a chave META_ACCESS_TOKEN no arquivo .env.`
             : (error.message || 'Erro ao buscar contas');
 
         return NextResponse.json(

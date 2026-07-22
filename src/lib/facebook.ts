@@ -202,7 +202,33 @@ async function fbFetch<T = any>(url: string): Promise<T> {
             throw netErr;
         }
 
-        // 5xx / 429 — sempre retentar
+        // Tentar parsear JSON primeiro (mesmo em 4xx/5xx) para obter o objeto json.error do Meta
+        let json: any = null;
+        try {
+            json = await res.json();
+        } catch {
+            json = null;
+        }
+
+        if (json?.error) {
+            const code = Number(json.error.code);
+            const subcode = Number(json.error.error_subcode);
+            const isTransient = TRANSIENT_FB_CODES.has(code) || subcode === 2446079;
+            const err: any = new Error(json.error.message || `Meta API HTTP ${res.status}`);
+            err.fb = json.error;
+            err.code = code;
+            err.status = res.status;
+            if (isTransient && attempt < MAX_RETRIES) {
+                lastErr = err;
+                const retryAfter = Number(res.headers.get('retry-after')) || 0;
+                const delay = retryAfter > 0 ? retryAfter * 1000 : BASE_DELAY_MS * 2 ** attempt + Math.random() * 250;
+                await sleep(delay);
+                continue;
+            }
+            throw err;
+        }
+
+        // 5xx / 429 sem JSON — retentar
         if (res.status >= 500 || res.status === 429) {
             const retryAfter = Number(res.headers.get('retry-after')) || 0;
             lastErr = new Error(`Meta HTTP ${res.status}${res.status === 429 ? ' (rate limit)' : ''}`);
@@ -216,31 +242,8 @@ async function fbFetch<T = any>(url: string): Promise<T> {
             throw lastErr;
         }
 
-        // tentar parsear JSON; se vier HTML/texto, tratar como transitório
-        let json: any;
-        try {
-            json = await res.json();
-        } catch {
-            lastErr = new Error(`Meta retornou resposta inválida (HTTP ${res.status})`);
-            if (attempt < MAX_RETRIES) {
-                await sleep(BASE_DELAY_MS * 2 ** attempt + Math.random() * 250);
-                continue;
-            }
-            throw lastErr;
-        }
-
-        if (json.error) {
-            const code = Number(json.error.code);
-            const subcode = Number(json.error.error_subcode);
-            const isTransient = TRANSIENT_FB_CODES.has(code) || subcode === 2446079;
-            const err: any = new Error(json.error.message || 'Erro Meta API');
-            err.fb = json.error;
-            if (isTransient && attempt < MAX_RETRIES) {
-                lastErr = err;
-                await sleep(BASE_DELAY_MS * 2 ** attempt + Math.random() * 250);
-                continue;
-            }
-            throw err;
+        if (!json) {
+            throw new Error(`Meta retornou resposta inválida (HTTP ${res.status})`);
         }
 
         return json;

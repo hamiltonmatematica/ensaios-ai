@@ -411,13 +411,13 @@ export default function MeuGestorDashboard() {
     }
 
     if (error) {
-        const isTokenError = error.includes("META_ACCESS_TOKEN") || error.includes("OAuth") || error.includes("token");
+        const isTokenError = error.includes("META_ACCESS_TOKEN") || error.includes("OAuth") || error.includes("token") || error.includes("Meta HTTP") || error.includes("500");
         return (
             <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div className="g-glass" style={{ padding: "2rem", textAlign: "center", maxWidth: 500 }}>
                     <AlertCircle style={{ width: 48, height: 48, color: "#f87171", margin: "0 auto 1rem" }} />
                     <h3 style={{ color: "white", fontSize: "1.1rem", fontWeight: 700, marginBottom: "0.5rem" }}>
-                        {isTokenError ? "Problema com Token da Meta API" : "Erro ao carregar dados"}
+                        {isTokenError ? "Problema de Conexão com a Meta API" : "Erro ao carregar dados"}
                     </h3>
                     <p style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.85rem", marginBottom: "1rem", lineHeight: 1.5 }}>
                         {error}
@@ -428,7 +428,7 @@ export default function MeuGestorDashboard() {
                             <ol style={{ paddingLeft: "1.2rem", marginTop: "0.4rem", marginBottom: 0 }}>
                                 <li>Acesse o <em>Meta Business / Graph API Explorer</em> e gere um novo <code>User Access Token</code>.</li>
                                 <li>Atualize a chave <code>META_ACCESS_TOKEN</code> no arquivo <code>.env</code>.</li>
-                                <li>Reinicie a aplicação para aplicar o novo token.</li>
+                                <li>Reinicie a aplicação (ou redeploy) para carregar as novas variáveis de ambiente.</li>
                             </ol>
                         </div>
                     )}
