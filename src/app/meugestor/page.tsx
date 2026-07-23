@@ -7,7 +7,7 @@ import {
     RefreshCw, Search, Loader2, AlertCircle, Eye, Menu, X,
     Building2, Layers, Hash, Brain, Wallet, Activity, Filter,
     Key, Check, ExternalLink,
-    Plus, Users2, Zap, Copy as CopyIcon,
+    Plus, Users2, Zap, Copy as CopyIcon, Globe,
 } from "lucide-react";
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -32,6 +32,7 @@ import CmdK, { CmdItem } from "./components/CmdK";
 import InsightsTable from "./components/InsightsTable";
 import SmartInsights from "./components/SmartInsights";
 import TokenModal from "./components/TokenModal";
+import GoogleAdsTokenModal, { GoogleAdsConfig, EMPTY_GOOGLE_ADS_CONFIG } from "./components/GoogleAdsTokenModal";
 import CreateCampaignWizard from "./components/CreateCampaignWizard";
 import AudienceManager from "./components/AudienceManager";
 import BudgetEditModal from "./components/BudgetEditModal";
@@ -128,6 +129,10 @@ export default function MeuGestorDashboard() {
     const [tokenModalOpen, setTokenModalOpen] = useState(false);
     const [inlineTokenInput, setInlineTokenInput] = useState("");
 
+    // Credenciais Google Ads
+    const [googleAdsConfig, setGoogleAdsConfig] = useState<GoogleAdsConfig>(EMPTY_GOOGLE_ADS_CONFIG);
+    const [googleAdsModalOpen, setGoogleAdsModalOpen] = useState(false);
+
     // Modais
     const [pickerOpen, setPickerOpen] = useState<null | "account" | "campaign" | "adset" | "ad">(null);
     const [kpiPickerOpen, setKpiPickerOpen] = useState<null | KpiCtx>(null);
@@ -145,6 +150,7 @@ export default function MeuGestorDashboard() {
         const savedToken = load<string>("custom_meta_token", "");
         setCustomMetaToken(savedToken);
         setInlineTokenInput(savedToken);
+        setGoogleAdsConfig(load<GoogleAdsConfig>("google_ads_config", EMPTY_GOOGLE_ADS_CONFIG));
         setFavorites(new Set(load<string[]>(KEYS.favorites, [])));
         setAccountMetrics(load(KEYS.metricsByLevel + ":account", DEFAULT_ACCOUNT_METRICS));
         setCampaignMetrics(load(KEYS.metricsByLevel + ":campaign", DEFAULT_CAMPAIGN_METRICS));
@@ -181,8 +187,14 @@ export default function MeuGestorDashboard() {
     const getApiHeaders = useCallback(() => {
         const h: Record<string, string> = {};
         if (customMetaToken) h["x-meta-access-token"] = customMetaToken;
+        if (googleAdsConfig.clientId) h["x-google-ads-client-id"] = googleAdsConfig.clientId;
+        if (googleAdsConfig.clientSecret) h["x-google-ads-client-secret"] = googleAdsConfig.clientSecret;
+        if (googleAdsConfig.developerToken) h["x-google-ads-developer-token"] = googleAdsConfig.developerToken;
+        if (googleAdsConfig.refreshToken) h["x-google-ads-refresh-token"] = googleAdsConfig.refreshToken;
+        if (googleAdsConfig.loginCustomerId) h["x-google-ads-login-customer-id"] = googleAdsConfig.loginCustomerId;
+        if (googleAdsConfig.customerId) h["x-google-ads-customer-id"] = googleAdsConfig.customerId;
         return h;
-    }, [customMetaToken]);
+    }, [customMetaToken, googleAdsConfig]);
 
     // ── Cmd+K shortcut ──
     useEffect(() => {
@@ -647,6 +659,16 @@ export default function MeuGestorDashboard() {
                             }}>
                             <Key style={{ width: 13, height: 13 }} />
                             <span>{customMetaToken ? "Token Ativo" : "Token Meta"}</span>
+                        </button>
+                        <button onClick={() => setGoogleAdsModalOpen(true)} className="g-btn-secondary"
+                            style={{
+                                display: "inline-flex", alignItems: "center", gap: "0.4rem",
+                                padding: "0.5rem 0.75rem", fontSize: "0.75rem",
+                                borderColor: googleAdsConfig.refreshToken ? "rgba(52,211,153,0.6)" : undefined,
+                                color: googleAdsConfig.refreshToken ? "#34d399" : undefined,
+                            }}>
+                            <Globe style={{ width: 13, height: 13 }} />
+                            <span>{googleAdsConfig.refreshToken ? "Google Ads Ativo" : "Google Ads"}</span>
                         </button>
                         <DateRangePicker value={period} onChange={setPeriod} compare={compare} onCompareChange={setCompare} />
                         <ExportMenu
@@ -1147,6 +1169,19 @@ export default function MeuGestorDashboard() {
                     save("custom_meta_token", "");
                     setInlineTokenInput("");
                     fetchAccounts();
+                }}
+            />
+            <GoogleAdsTokenModal
+                open={googleAdsModalOpen}
+                onClose={() => setGoogleAdsModalOpen(false)}
+                currentConfig={googleAdsConfig}
+                onSave={(cfg) => {
+                    setGoogleAdsConfig(cfg);
+                    save("google_ads_config", cfg);
+                }}
+                onClear={() => {
+                    setGoogleAdsConfig(EMPTY_GOOGLE_ADS_CONFIG);
+                    save("google_ads_config", EMPTY_GOOGLE_ADS_CONFIG);
                 }}
             />
             <CreateCampaignWizard
