@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-    getBreakdownInsights, flattenInsight,
+    getBreakdownInsights, flattenInsight, getMetaAccessToken,
     presetToRange, MetaDatePreset, MetaTimeRange, MetaBreakdown,
 } from '@/lib/facebook';
 
@@ -19,7 +19,7 @@ export async function GET(
 ) {
     try {
         const { id } = await params;
-        const accessToken = process.env.META_ACCESS_TOKEN;
+        const accessToken = getMetaAccessToken(request);
         if (!accessToken) {
             return NextResponse.json({ success: false, error: 'META_ACCESS_TOKEN não configurado' }, { status: 400 });
         }

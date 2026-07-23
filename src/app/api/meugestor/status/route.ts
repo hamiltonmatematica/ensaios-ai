@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMetaAccessToken } from '@/lib/facebook';
+import { requireWriteToken } from '@/lib/meugestor-write-guard';
 
 const FB_GRAPH_URL = 'https://graph.facebook.com/v22.0';
 
 export async function POST(request: NextRequest) {
     try {
-        const accessToken = getMetaAccessToken(request);
-        if (!accessToken) {
-            return NextResponse.json({ success: false, error: 'META_ACCESS_TOKEN não configurado' }, { status: 400 });
-        }
+        const auth = requireWriteToken(request);
+        if (auth.response) return auth.response;
+        const accessToken = auth.token;
 
         const { id, status } = await request.json();
 

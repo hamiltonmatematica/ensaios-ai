@@ -7,6 +7,7 @@ import {
     RefreshCw, Search, Loader2, AlertCircle, Eye, Menu, X,
     Building2, Layers, Hash, Brain, Wallet, Activity, Filter,
     Key, Check, ExternalLink,
+    Plus, Users2, Zap, Copy as CopyIcon,
 } from "lucide-react";
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -31,6 +32,10 @@ import CmdK, { CmdItem } from "./components/CmdK";
 import InsightsTable from "./components/InsightsTable";
 import SmartInsights from "./components/SmartInsights";
 import TokenModal from "./components/TokenModal";
+import CreateCampaignWizard from "./components/CreateCampaignWizard";
+import AudienceManager from "./components/AudienceManager";
+import BudgetEditModal from "./components/BudgetEditModal";
+import RulesPanel from "./components/RulesPanel";
 import { DEFAULT_KPIS, KpiCtx, aggregateRow } from "./lib/kpis";
 
 // ─────────────────────────────────────────────────────────────
@@ -51,6 +56,27 @@ const DEFAULT_ADSET_METRICS = ["spend", "impressions", "ctr", "inline_link_click
 const DEFAULT_AD_METRICS = ["spend", "impressions", "ctr", "cpc", "leads", "cpl", "messaging_started", "hook_rate", "hold_rate", "frequency"];
 
 interface PeriodMeta { preset?: string; range?: { since: string; until: string }; previous?: { since: string; until: string } | null; }
+
+// ─────────────────────────────────────────────────────────────
+// HELPERS DE CAMPOS DE ENTIDADE (campanha/conjunto/anúncio)
+// ─────────────────────────────────────────────────────────────
+// ATENÇÃO: as rotas de insights (/api/meugestor/accounts/[id] e /campaigns/[id])
+// hoje retornam apenas métricas + id/nome — daily_budget, status e effective_status
+// são campos de ENTIDADE e ainda não vêm mesclados nas linhas. Enquanto o backend
+// não mesclar esses campos, os helpers abaixo retornam null/"ACTIVE" (desconhecido).
+// Eles já normalizam o formato da Meta (centavos como string) para funcionar
+// corretamente assim que os campos passarem a ser enviados.
+
+/** Orçamento diário da entidade em centavos (Meta envia string de centavos); null se ausente/inválido. */
+function entityDailyBudgetCents(r: any): number | null {
+    const n = Number(r?.daily_budget);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+}
+
+/** Status configurado da entidade, com fallback para effective_status; "ACTIVE" quando desconhecido. */
+function entityStatus(r: any): string {
+    return r?.status || r?.effective_status || "ACTIVE";
+}
 
 // ─────────────────────────────────────────────────────────────
 // MAIN
@@ -107,6 +133,12 @@ export default function MeuGestorDashboard() {
     const [kpiPickerOpen, setKpiPickerOpen] = useState<null | KpiCtx>(null);
     const [cmdkOpen, setCmdkOpen] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
+
+    // Gestão (criar / públicos / regras / orçamento)
+    const [createOpen, setCreateOpen] = useState(false);
+    const [audiencesOpen, setAudiencesOpen] = useState(false);
+    const [rulesOpen, setRulesOpen] = useState(false);
+    const [budgetEntity, setBudgetEntity] = useState<{ id: string; name: string; kind: "campaign" | "adset"; currentDailyCents?: number | null } | null>(null);
 
     // ── Hidrata localStorage ──
     useEffect(() => {
@@ -249,12 +281,6 @@ export default function MeuGestorDashboard() {
             if (campaignAbortRef.current === ctrl) setLoadingCampaign(false);
         }
     }, [buildPeriodParams, getApiHeaders]);
-        } catch (e: any) {
-            if (e.name !== "AbortError") console.error(e);
-        } finally {
-            if (campaignAbortRef.current === ctrl) setLoadingCampaign(false);
-        }
-    }, [buildPeriodParams]);
 
     // re-busca detalhes ao mudar período
     useEffect(() => {
@@ -301,7 +327,7 @@ export default function MeuGestorDashboard() {
         if (!confirm(`Deseja ${newStatus === "PAUSED" ? "PAUSAR" : "ATIVAR"} ${kind === "campaign" ? "esta campanha" : "este anúncio"}?`)) return;
         try {
             const res = await fetch("/api/meugestor/status", {
-                method: "POST", headers: { "Content-Type": "application/json" },
+                method: "POST", headers: { "Content-Type": "application/json", ...getApiHeaders() },
                 body: JSON.stringify({ id, status: newStatus }),
             });
             const data = await res.json();
@@ -311,6 +337,24 @@ export default function MeuGestorDashboard() {
             } else if (kind === "ad" && campaignDetail) {
                 setCampaignDetail({ ...campaignDetail, ads: campaignDetail.ads.map((a: any) => a.ad_id === id ? { ...a, status: newStatus } : a) });
             }
+        } catch (e: any) {
+            alert("Erro: " + e.message);
+        }
+    };
+
+    const handleDuplicate = async (id: string, kind: "campaign" | "adset" | "ad", name: string) => {
+        if (!confirm(`Duplicar "${name}"? A cópia será criada PAUSADA.`)) return;
+        try {
+            const res = await fetch("/api/meugestor/manage/copy", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...getApiHeaders() },
+                body: JSON.stringify({ id, kind }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error || "Falha ao duplicar");
+            alert("Criado (pausado): " + JSON.stringify(json.data || {}).slice(0, 200));
+            if (kind === "ad" && selectedCampaignId) fetchCampaignDetail(selectedCampaignId);
+            else if (selectedAccountId) fetchAccountDetail(selectedAccountId);
         } catch (e: any) {
             alert("Erro: " + e.message);
         }
@@ -392,6 +436,10 @@ export default function MeuGestorDashboard() {
 
     const cmdItems: CmdItem[] = useMemo(() => {
         const items: CmdItem[] = [];
+        items.push({
+            id: "action-create-campaign", title: "Criar campanha", subtitle: "Abrir assistente de criação",
+            type: "campaign", onSelect: () => setCreateOpen(true),
+        });
         for (const a of accounts) {
             items.push({
                 id: a.id, title: a.name || a.account_id, subtitle: `${formatCurrency(a.spend)} · ${a.leads || 0} leads`,
@@ -585,6 +633,11 @@ export default function MeuGestorDashboard() {
                         </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <button onClick={() => setCreateOpen(true)} className="g-btn-primary"
+                            style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", padding: "0.5rem 0.75rem", fontSize: "0.75rem" }}>
+                            <Plus style={{ width: 13, height: 13 }} />
+                            <span>Criar</span>
+                        </button>
                         <button onClick={() => setTokenModalOpen(true)} className="g-btn-secondary"
                             style={{
                                 display: "inline-flex", alignItems: "center", gap: "0.4rem",
@@ -751,6 +804,20 @@ export default function MeuGestorDashboard() {
                     {/* ========== ACCOUNT DETAIL ========== */}
                     {selectedAccountId && selectedAccount && !selectedCampaignId && !selectedAdId && (
                         <div className="g-fade-in" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                            {/* Ferramentas de gestão da conta */}
+                            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                                <button onClick={() => setAudiencesOpen(true)} className="g-btn-secondary"
+                                    style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", padding: "0.5rem 0.75rem", fontSize: "0.75rem" }}>
+                                    <Users2 style={{ width: 13, height: 13 }} />
+                                    <span>Públicos</span>
+                                </button>
+                                <button onClick={() => setRulesOpen(true)} className="g-btn-secondary"
+                                    style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", padding: "0.5rem 0.75rem", fontSize: "0.75rem" }}>
+                                    <Zap style={{ width: 13, height: 13 }} />
+                                    <span>Regras</span>
+                                </button>
+                            </div>
+
                             {/* KPIs editáveis da conta */}
                             <KpiGrid ctx="account" row={selectedAccount} selected={accountKpis} onOpenPicker={() => setKpiPickerOpen("account")} />
 
@@ -828,10 +895,20 @@ export default function MeuGestorDashboard() {
                                             emptyText="Nenhuma campanha com dados no período."
                                             extraColumnsRight={[{
                                                 key: "status", label: "Ações", render: (r: any) => (
-                                                    <button onClick={() => handleToggleStatus(r.campaign_id, r.status || "ACTIVE", "campaign")} className="g-btn-secondary"
-                                                        style={{ padding: "0.25rem 0.55rem", fontSize: "0.65rem" }}>
-                                                        {r.status === "PAUSED" ? <span style={{ color: "#34d399" }}>▶ Ativar</span> : <span style={{ color: "#fbbf24" }}>⏸ Pausar</span>}
-                                                    </button>
+                                                    <div style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }} onClick={e => e.stopPropagation()}>
+                                                        <button onClick={() => handleToggleStatus(r.campaign_id, entityStatus(r), "campaign")} className="g-btn-secondary"
+                                                            style={{ padding: "0.25rem 0.55rem", fontSize: "0.65rem" }}>
+                                                            {entityStatus(r) === "PAUSED" ? <span style={{ color: "#34d399" }}>▶ Ativar</span> : <span style={{ color: "#fbbf24" }}>⏸ Pausar</span>}
+                                                        </button>
+                                                        <button onClick={e => { e.stopPropagation(); handleDuplicate(r.campaign_id, "campaign", r.campaign_name || "campanha"); }}
+                                                            title="Duplicar campanha (cópia pausada)" className="g-btn-secondary" style={{ padding: "0.25rem 0.45rem", display: "inline-flex" }}>
+                                                            <CopyIcon style={{ width: 12, height: 12 }} />
+                                                        </button>
+                                                        <button onClick={e => { e.stopPropagation(); setBudgetEntity({ id: r.campaign_id, name: r.campaign_name || "Campanha", kind: "campaign", currentDailyCents: entityDailyBudgetCents(r) }); }}
+                                                            title="Editar orçamento diário" className="g-btn-secondary" style={{ padding: "0.25rem 0.45rem", display: "inline-flex" }}>
+                                                            <Wallet style={{ width: 12, height: 12 }} />
+                                                        </button>
+                                                    </div>
                                                 )
                                             }]}
                                         />
@@ -899,6 +976,20 @@ export default function MeuGestorDashboard() {
                                                 onRowClick={r => handleSelectAdset(r.adset_id)}
                                                 onOpenMetricsPicker={() => setPickerOpen("adset")}
                                                 emptyText="Nenhum conjunto com dados no período."
+                                                extraColumnsRight={[{
+                                                    key: "manage", label: "Ações", render: (r: any) => (
+                                                        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }} onClick={e => e.stopPropagation()}>
+                                                            <button onClick={e => { e.stopPropagation(); handleDuplicate(r.adset_id, "adset", r.adset_name || "conjunto"); }}
+                                                                title="Duplicar conjunto (cópia pausada)" className="g-btn-secondary" style={{ padding: "0.25rem 0.45rem", display: "inline-flex" }}>
+                                                                <CopyIcon style={{ width: 12, height: 12 }} />
+                                                            </button>
+                                                            <button onClick={e => { e.stopPropagation(); setBudgetEntity({ id: r.adset_id, name: r.adset_name || "Conjunto", kind: "adset", currentDailyCents: entityDailyBudgetCents(r) }); }}
+                                                                title="Editar orçamento diário" className="g-btn-secondary" style={{ padding: "0.25rem 0.45rem", display: "inline-flex" }}>
+                                                                <Wallet style={{ width: 12, height: 12 }} />
+                                                            </button>
+                                                        </div>
+                                                    )
+                                                }]}
                                             />
                                         )}
                                     </div>
@@ -944,10 +1035,16 @@ export default function MeuGestorDashboard() {
                                         emptyText="Nenhum anúncio com dados no período."
                                         extraColumnsRight={[{
                                             key: "status", label: "Ações", render: (r: any) => (
-                                                <button onClick={() => handleToggleStatus(r.ad_id, r.status || "ACTIVE", "ad")} className="g-btn-secondary"
-                                                    style={{ padding: "0.25rem 0.55rem", fontSize: "0.65rem" }}>
-                                                    {r.status === "PAUSED" ? <span style={{ color: "#34d399" }}>▶ Ativar</span> : <span style={{ color: "#fbbf24" }}>⏸ Pausar</span>}
-                                                </button>
+                                                <div style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }} onClick={e => e.stopPropagation()}>
+                                                    <button onClick={() => handleToggleStatus(r.ad_id, entityStatus(r), "ad")} className="g-btn-secondary"
+                                                        style={{ padding: "0.25rem 0.55rem", fontSize: "0.65rem" }}>
+                                                        {entityStatus(r) === "PAUSED" ? <span style={{ color: "#34d399" }}>▶ Ativar</span> : <span style={{ color: "#fbbf24" }}>⏸ Pausar</span>}
+                                                    </button>
+                                                    <button onClick={e => { e.stopPropagation(); handleDuplicate(r.ad_id, "ad", r.ad_name || "anúncio"); }}
+                                                        title="Duplicar anúncio (cópia pausada)" className="g-btn-secondary" style={{ padding: "0.25rem 0.45rem", display: "inline-flex" }}>
+                                                        <CopyIcon style={{ width: 12, height: 12 }} />
+                                                    </button>
+                                                </div>
                                             )
                                         }]}
                                     />
@@ -1051,6 +1148,37 @@ export default function MeuGestorDashboard() {
                     setInlineTokenInput("");
                     fetchAccounts();
                 }}
+            />
+            <CreateCampaignWizard
+                open={createOpen}
+                onClose={() => setCreateOpen(false)}
+                accountId={selectedAccountId}
+                accounts={accounts.map((a: any) => ({ id: a.id, name: a.name || a.account_id }))}
+                apiHeaders={getApiHeaders()}
+                onCreated={() => { if (selectedAccountId) fetchAccountDetail(selectedAccountId); else fetchAccounts(); }}
+            />
+            {audiencesOpen && selectedAccountId && (
+                <AudienceManager
+                    open={audiencesOpen}
+                    onClose={() => setAudiencesOpen(false)}
+                    accountId={selectedAccountId}
+                    apiHeaders={getApiHeaders()}
+                />
+            )}
+            {rulesOpen && selectedAccountId && (
+                <RulesPanel
+                    open={rulesOpen}
+                    onClose={() => setRulesOpen(false)}
+                    accountId={selectedAccountId}
+                    apiHeaders={getApiHeaders()}
+                />
+            )}
+            <BudgetEditModal
+                open={!!budgetEntity}
+                entity={budgetEntity}
+                onClose={() => setBudgetEntity(null)}
+                apiHeaders={getApiHeaders()}
+                onSaved={() => { if (selectedAccountId) fetchAccountDetail(selectedAccountId); }}
             />
 
             <footer style={{ textAlign: "center", padding: "1.25rem 1rem", fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", borderTop: "1px solid var(--glass-border)", marginTop: "1.5rem" }}>

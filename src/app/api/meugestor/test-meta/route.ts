@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
-import { getAccountInsights, getCampaignsInsights, getDailyInsights } from '@/lib/facebook';
+import { NextRequest, NextResponse } from 'next/server';
+import { getAccountInsights, getCampaignsInsights, getDailyInsights, getMetaAccessToken } from '@/lib/facebook';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
-        const accessToken = process.env.META_ACCESS_TOKEN;
+        const accessToken = getMetaAccessToken(request);
         let adAccountId = process.env.META_AD_ACCOUNT_ID;
 
         if (!accessToken || !adAccountId) {

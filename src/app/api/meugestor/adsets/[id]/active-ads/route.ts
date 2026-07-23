@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getActiveAdsForAdset } from '@/lib/facebook';
+import { getActiveAdsForAdset, getMetaAccessToken } from '@/lib/facebook';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-    _request: NextRequest,
+    request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
-        const accessToken = process.env.META_ACCESS_TOKEN;
+        const accessToken = getMetaAccessToken(request);
         if (!accessToken) {
             return NextResponse.json({ success: false, error: 'META_ACCESS_TOKEN não configurado' }, { status: 400 });
         }
