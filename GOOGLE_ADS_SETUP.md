@@ -4,16 +4,21 @@ Guia manual para obter tudo que a integração Google Ads do meugestor vai preci
 
 Veja também [GOOGLE_ADS_INTEGRATION.md](GOOGLE_ADS_INTEGRATION.md) para o roadmap técnico de como o código vai usar essas credenciais.
 
+> **Sua conta bloqueia a criação de app/projeto no Google Cloud?** Sem problema — o projeto do Google Cloud (passo 1) e o MCC do Google Ads (passo 2) **não precisam ser a mesma conta Google**. Use uma conta secundária qualquer (até um Gmail pessoal novo, sem nenhum vínculo com o MCC) só para criar o projeto e gerar o Client ID/Secret no passo 1. O Developer Token continua vindo do MCC de sempre (passo 2), e no passo 3 você loga com a conta do MCC (não com a secundária) pra autorizar — é essa autorização que gera o Refresh Token vinculado à conta certa. O passo a passo abaixo já indica onde trocar de conta.
+
 ## 1) Google Cloud — criar as credenciais OAuth
 
-1. Acesse [console.cloud.google.com](https://console.cloud.google.com) e crie um projeto novo (ou use um existente).
+> Use aqui a **conta secundária** (a que não está bloqueada), se for o seu caso. Se sua conta principal cria projetos normalmente, pode usar ela mesma — não muda nada no resto do processo.
+
+> **Nota**: o Google renomeou essa área do console para **"Google Auth Platform"** (a antiga "Tela de consentimento OAuth"). Os nomes dos menus abaixo já refletem a UI nova — se você ver nomes diferentes, é a UI antiga, mas o conceito é o mesmo.
+
+1. Acesse [console.cloud.google.com](https://console.cloud.google.com), logado com a conta escolhida para este passo, e crie um projeto novo (ou use um existente).
 2. Menu **APIs e Serviços → Biblioteca** → procure **"Google Ads API"** → clique **Ativar**.
-3. Menu **APIs e Serviços → Tela de consentimento OAuth**:
-   - Tipo: **Externo**.
-   - Preencha nome do app, e-mail de suporte, e-mail do desenvolvedor.
-   - Em "Escopos", não precisa adicionar nada agora.
-   - Em "Usuários de teste", adicione o **seu próprio e-mail Google** (o mesmo que acessa o MCC). Enquanto o app estiver em modo "Testing", só esses e-mails conseguem autorizar.
-4. Menu **APIs e Serviços → Credenciais → Criar Credenciais → ID do cliente OAuth**:
+3. Vá em **Google Auth Platform → Público-alvo** (Audience):
+   - Tipo de público: **Externo**.
+   - Em **"Usuários de teste"** (Test users), clique em **Adicionar usuários** e adicione o **e-mail que administra o MCC** (mesmo que seja diferente da conta que está criando o projeto agora). Enquanto o app estiver em modo "Testing", só esse e-mail consegue autorizar no passo 3 — se esquecer desse detalhe, a autorização falha.
+4. Vá em **Google Auth Platform → Branding** e preencha nome do app, e-mail de suporte, e-mail do desenvolvedor (obrigatório antes de conseguir criar o cliente).
+5. Vá em **Google Auth Platform → Clientes** (Clients) → **Criar cliente OAuth**:
    - Tipo de aplicativo: **Aplicativo da Web**.
    - Em "URIs de redirecionamento autorizados", adicione: `https://developers.google.com/oauthplayground`
    - Salve e copie o **Client ID** e o **Client Secret** → vão em `GOOGLE_ADS_CLIENT_ID` e `GOOGLE_ADS_CLIENT_SECRET`.
@@ -32,7 +37,7 @@ Use o **OAuth Playground do Google** — ferramenta oficial feita exatamente pra
 1. Acesse [developers.google.com/oauthplayground](https://developers.google.com/oauthplayground).
 2. Clique no ícone de engrenagem (⚙️) no canto superior direito → marque **"Use your own OAuth credentials"** → cole o Client ID e Client Secret do passo 1.
 3. Na coluna da esquerda, no campo "Input your own scopes", cole: `https://www.googleapis.com/auth/adwords` → clique **Authorize APIs**.
-4. Faça login com a conta Google que tem acesso ao MCC e aceite a permissão.
+4. **Importante**: faça login com a conta que **administra o MCC** — não com a conta secundária usada no passo 1, caso sejam contas diferentes. É essa conta que precisa aceitar a permissão.
 5. De volta no Playground, clique **Exchange authorization code for tokens**.
 6. Copie o **Refresh token** (string longa começando com `1//`) → vai em `GOOGLE_ADS_REFRESH_TOKEN`. Não expira até você revogar o acesso — é o token que o app vai usar pra sempre gerar novos access tokens sozinho.
 

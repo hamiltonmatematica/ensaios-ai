@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Globe, Check, ExternalLink, X, Trash2 } from "lucide-react";
+import { Globe, Check, X, Trash2, PlugZap, Loader2, CircleCheck, CircleAlert } from "lucide-react";
 
 export interface GoogleAdsConfig {
     clientId: string;
@@ -32,12 +32,17 @@ const FIELDS: { key: keyof GoogleAdsConfig; label: string; placeholder: string; 
     { key: "customerId", label: "Customer ID (conta a gerenciar)", placeholder: "1234567890 (sem traços)" },
 ];
 
+type TestResult = { ok: true; customerIds: string[] } | { ok: false; error: string };
+
 export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSave, onClear }: Props) {
     const [config, setConfig] = useState<GoogleAdsConfig>(currentConfig);
     const [saved, setSaved] = useState(false);
+    const [testing, setTesting] = useState(false);
+    const [testResult, setTestResult] = useState<TestResult | null>(null);
 
     useEffect(() => {
         setConfig(currentConfig);
+        setTestResult(null);
     }, [currentConfig, open]);
 
     if (!open) return null;
@@ -52,7 +57,34 @@ export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSa
 
     const handleClear = () => {
         setConfig(EMPTY_GOOGLE_ADS_CONFIG);
+        setTestResult(null);
         onClear();
+    };
+
+    const handleTest = async () => {
+        setTesting(true);
+        setTestResult(null);
+        try {
+            const headers: Record<string, string> = {};
+            if (config.clientId) headers["x-google-ads-client-id"] = config.clientId;
+            if (config.clientSecret) headers["x-google-ads-client-secret"] = config.clientSecret;
+            if (config.developerToken) headers["x-google-ads-developer-token"] = config.developerToken;
+            if (config.refreshToken) headers["x-google-ads-refresh-token"] = config.refreshToken;
+            if (config.loginCustomerId) headers["x-google-ads-login-customer-id"] = config.loginCustomerId;
+            if (config.customerId) headers["x-google-ads-customer-id"] = config.customerId;
+
+            const res = await fetch("/api/meugestor/gads/test", { headers });
+            const json = await res.json();
+            if (json.success) {
+                setTestResult({ ok: true, customerIds: json.data?.accessibleCustomerIds || [] });
+            } else {
+                setTestResult({ ok: false, error: json.error || "Falha desconhecida" });
+            }
+        } catch (e: any) {
+            setTestResult({ ok: false, error: e.message || "Falha de rede ao testar conexão" });
+        } finally {
+            setTesting(false);
+        }
     };
 
     return (
@@ -106,6 +138,41 @@ export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSa
                 <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "0.5rem", padding: "0.75rem", marginBottom: "1.25rem", fontSize: "0.75rem", color: "rgba(255,255,255,0.7)" }}>
                     <p style={{ margin: 0, fontWeight: 600, color: "white" }}>Como conseguir esses valores?</p>
                     <p style={{ margin: "0.3rem 0 0" }}>Passo a passo completo em GOOGLE_ADS_SETUP.md (Google Cloud Console + MCC + OAuth Playground).</p>
+                </div>
+
+                <div style={{ marginBottom: "1.25rem" }}>
+                    <button
+                        onClick={handleTest}
+                        disabled={testing || !config.clientId || !config.clientSecret || !config.developerToken || !config.refreshToken}
+                        className="g-btn-secondary"
+                        style={{ width: "100%", justifyContent: "center", padding: "0.6rem", fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: "0.4rem", opacity: (testing || !config.clientId || !config.clientSecret || !config.developerToken || !config.refreshToken) ? 0.5 : 1 }}
+                    >
+                        {testing ? <Loader2 className="g-pulse" style={{ width: 14, height: 14 }} /> : <PlugZap style={{ width: 14, height: 14 }} />}
+                        {testing ? "Testando..." : "Testar conexão"}
+                    </button>
+
+                    {testResult && (
+                        <div style={{
+                            marginTop: "0.6rem", borderRadius: "0.5rem", padding: "0.65rem 0.75rem", fontSize: "0.72rem",
+                            background: testResult.ok ? "rgba(52,211,153,0.1)" : "rgba(248,113,113,0.1)",
+                            border: `1px solid ${testResult.ok ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"}`,
+                            color: testResult.ok ? "#34d399" : "#f87171",
+                        }}>
+                            {testResult.ok ? (
+                                <div style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start" }}>
+                                    <CircleCheck style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1 }} />
+                                    <span>
+                                        Conectado! Customer IDs acessíveis: {testResult.customerIds.length ? testResult.customerIds.join(", ") : "nenhum (revise o Login Customer ID / permissões do MCC)"}
+                                    </span>
+                                </div>
+                            ) : (
+                                <div style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start" }}>
+                                    <CircleAlert style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1 }} />
+                                    <span>{testResult.error}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
