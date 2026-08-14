@@ -188,12 +188,7 @@ export default function MeuGestorDashboard() {
     const getApiHeaders = useCallback(() => {
         const h: Record<string, string> = {};
         if (customMetaToken) h["x-meta-access-token"] = customMetaToken;
-        if (googleAdsConfig.clientId) h["x-google-ads-client-id"] = googleAdsConfig.clientId;
-        if (googleAdsConfig.clientSecret) h["x-google-ads-client-secret"] = googleAdsConfig.clientSecret;
-        if (googleAdsConfig.developerToken) h["x-google-ads-developer-token"] = googleAdsConfig.developerToken;
-        if (googleAdsConfig.refreshToken) h["x-google-ads-refresh-token"] = googleAdsConfig.refreshToken;
-        if (googleAdsConfig.loginCustomerId) h["x-google-ads-login-customer-id"] = googleAdsConfig.loginCustomerId;
-        if (googleAdsConfig.customerId) h["x-google-ads-customer-id"] = googleAdsConfig.customerId;
+        if (googleAdsConfig.sheetCsvUrl) h["x-google-ads-sheet-url"] = googleAdsConfig.sheetCsvUrl;
         return h;
     }, [customMetaToken, googleAdsConfig]);
 
@@ -226,7 +221,7 @@ export default function MeuGestorDashboard() {
         setLoading(true); setError(null); setGoogleAdsError(null);
         try {
             const params = buildPeriodParams().toString();
-            const hasGoogleCreds = !!(googleAdsConfig.clientId && googleAdsConfig.clientSecret && googleAdsConfig.developerToken && googleAdsConfig.refreshToken);
+            const hasGoogleCreds = !!googleAdsConfig.sheetCsvUrl;
 
             const metaPromise = fetch(`/api/meugestor/accounts?${params}`, {
                 headers: getApiHeaders(), signal: ctrl.signal,
@@ -683,11 +678,11 @@ export default function MeuGestorDashboard() {
                             style={{
                                 display: "inline-flex", alignItems: "center", gap: "0.4rem",
                                 padding: "0.5rem 0.75rem", fontSize: "0.75rem",
-                                borderColor: googleAdsConfig.refreshToken ? "rgba(52,211,153,0.6)" : undefined,
-                                color: googleAdsConfig.refreshToken ? "#34d399" : undefined,
+                                borderColor: googleAdsConfig.sheetCsvUrl ? "rgba(52,211,153,0.6)" : undefined,
+                                color: googleAdsConfig.sheetCsvUrl ? "#34d399" : undefined,
                             }}>
                             <Globe style={{ width: 13, height: 13 }} />
-                            <span>{googleAdsConfig.refreshToken ? "Google Ads Ativo" : "Google Ads"}</span>
+                            <span>{googleAdsConfig.sheetCsvUrl ? "Google Ads Ativo" : "Google Ads"}</span>
                         </button>
                         <DateRangePicker value={period} onChange={setPeriod} compare={compare} onCompareChange={setCompare} />
                         <ExportMenu

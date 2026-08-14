@@ -3,17 +3,10 @@ import { useState, useEffect } from "react";
 import { Globe, Check, X, Trash2, PlugZap, Loader2, CircleCheck, CircleAlert } from "lucide-react";
 
 export interface GoogleAdsConfig {
-    clientId: string;
-    clientSecret: string;
-    developerToken: string;
-    refreshToken: string;
-    loginCustomerId: string;
-    customerId: string;
+    sheetCsvUrl: string;
 }
 
-export const EMPTY_GOOGLE_ADS_CONFIG: GoogleAdsConfig = {
-    clientId: "", clientSecret: "", developerToken: "", refreshToken: "", loginCustomerId: "", customerId: "",
-};
+export const EMPTY_GOOGLE_ADS_CONFIG: GoogleAdsConfig = { sheetCsvUrl: "" };
 
 interface Props {
     open: boolean;
@@ -23,16 +16,9 @@ interface Props {
     onClear: () => void;
 }
 
-const FIELDS: { key: keyof GoogleAdsConfig; label: string; placeholder: string; secret?: boolean }[] = [
-    { key: "clientId", label: "Client ID", placeholder: "xxxxxxxx.apps.googleusercontent.com" },
-    { key: "clientSecret", label: "Client Secret", placeholder: "GOCSPX-...", secret: true },
-    { key: "developerToken", label: "Developer Token", placeholder: "Token do API Center (MCC)", secret: true },
-    { key: "refreshToken", label: "Refresh Token", placeholder: "1//...", secret: true },
-    { key: "loginCustomerId", label: "Login Customer ID (MCC)", placeholder: "1234567890 (sem traços)" },
-    { key: "customerId", label: "Customer ID (conta a gerenciar)", placeholder: "1234567890 (sem traços)" },
-];
-
-type TestResult = { ok: true; customerIds: string[] } | { ok: false; error: string };
+type TestResult =
+    | { ok: true; rowCount: number; accountCount: number; accountNames: string[]; dateFrom: string; dateTo: string }
+    | { ok: false; error: string };
 
 export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSave, onClear }: Props) {
     const [config, setConfig] = useState<GoogleAdsConfig>(currentConfig);
@@ -47,7 +33,7 @@ export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSa
 
     if (!open) return null;
 
-    const isConfigured = Object.values(currentConfig).some(Boolean);
+    const isConfigured = !!currentConfig.sheetCsvUrl;
 
     const handleSave = () => {
         onSave(config);
@@ -66,22 +52,17 @@ export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSa
         setTestResult(null);
         try {
             const headers: Record<string, string> = {};
-            if (config.clientId) headers["x-google-ads-client-id"] = config.clientId;
-            if (config.clientSecret) headers["x-google-ads-client-secret"] = config.clientSecret;
-            if (config.developerToken) headers["x-google-ads-developer-token"] = config.developerToken;
-            if (config.refreshToken) headers["x-google-ads-refresh-token"] = config.refreshToken;
-            if (config.loginCustomerId) headers["x-google-ads-login-customer-id"] = config.loginCustomerId;
-            if (config.customerId) headers["x-google-ads-customer-id"] = config.customerId;
+            if (config.sheetCsvUrl) headers["x-google-ads-sheet-url"] = config.sheetCsvUrl;
 
             const res = await fetch("/api/meugestor/gads/test", { headers });
             const json = await res.json();
             if (json.success) {
-                setTestResult({ ok: true, customerIds: json.data?.accessibleCustomerIds || [] });
+                setTestResult({ ok: true, ...json.data });
             } else {
                 setTestResult({ ok: false, error: json.error || "Falha desconhecida" });
             }
         } catch (e: any) {
-            setTestResult({ ok: false, error: e.message || "Falha de rede ao testar conexão" });
+            setTestResult({ ok: false, error: e.message || "Falha de rede ao testar a planilha" });
         } finally {
             setTesting(false);
         }
@@ -103,7 +84,7 @@ export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSa
                         </div>
                         <div>
                             <h3 style={{ color: "white", fontSize: "0.95rem", fontWeight: 700, margin: 0 }}>Configuração Google Ads</h3>
-                            <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.68rem", margin: 0 }}>Credenciais ficam salvas só no seu navegador</p>
+                            <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.68rem", margin: 0 }}>Via planilha exportada — sem OAuth, sem Google Cloud</p>
                         </div>
                     </div>
                     <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer" }}>
@@ -111,44 +92,40 @@ export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSa
                     </button>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.9rem", marginBottom: "1.25rem" }}>
-                    {FIELDS.map(f => (
-                        <div key={f.key}>
-                            <label style={{ display: "block", fontSize: "0.75rem", color: "rgba(255,255,255,0.7)", marginBottom: "0.35rem", fontWeight: 600 }}>
-                                {f.label}
-                            </label>
-                            <input
-                                type={f.secret ? "password" : "text"}
-                                value={config[f.key]}
-                                onChange={e => setConfig({ ...config, [f.key]: e.target.value })}
-                                placeholder={f.placeholder}
-                                style={{
-                                    width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.15)",
-                                    borderRadius: "0.5rem", padding: "0.6rem 0.75rem", color: "white", fontSize: "0.8rem",
-                                    fontFamily: "monospace", outline: "none", boxSizing: "border-box",
-                                }}
-                            />
-                        </div>
-                    ))}
-                    <p style={{ fontSize: "0.68rem", color: "rgba(255,255,255,0.4)", margin: 0 }}>
-                        Esses valores ficam salvos no localStorage do seu navegador e são enviados automaticamente nas consultas ao Google Ads.
+                <div style={{ marginBottom: "1.25rem" }}>
+                    <label style={{ display: "block", fontSize: "0.75rem", color: "rgba(255,255,255,0.7)", marginBottom: "0.35rem", fontWeight: 600 }}>
+                        URL do CSV publicado da planilha
+                    </label>
+                    <input
+                        type="text"
+                        value={config.sheetCsvUrl}
+                        onChange={e => setConfig({ sheetCsvUrl: e.target.value })}
+                        placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"
+                        style={{
+                            width: "100%", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.15)",
+                            borderRadius: "0.5rem", padding: "0.6rem 0.75rem", color: "white", fontSize: "0.8rem",
+                            fontFamily: "monospace", outline: "none", boxSizing: "border-box",
+                        }}
+                    />
+                    <p style={{ fontSize: "0.68rem", color: "rgba(255,255,255,0.4)", marginTop: "0.4rem" }}>
+                        Essa URL fica salva no localStorage do seu navegador e é usada pra baixar as métricas a cada consulta.
                     </p>
                 </div>
 
                 <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "0.5rem", padding: "0.75rem", marginBottom: "1.25rem", fontSize: "0.75rem", color: "rgba(255,255,255,0.7)" }}>
-                    <p style={{ margin: 0, fontWeight: 600, color: "white" }}>Como conseguir esses valores?</p>
-                    <p style={{ margin: "0.3rem 0 0" }}>Passo a passo completo em GOOGLE_ADS_SETUP.md (Google Cloud Console + MCC + OAuth Playground).</p>
+                    <p style={{ margin: 0, fontWeight: 600, color: "white" }}>Como conseguir essa URL?</p>
+                    <p style={{ margin: "0.3rem 0 0" }}>Passo a passo completo em GOOGLE_ADS_SETUP.md — um Google Ads Script (scripts/google-ads-export.gs) exporta os dados pra uma Google Sheets, que você publica na web como CSV.</p>
                 </div>
 
                 <div style={{ marginBottom: "1.25rem" }}>
                     <button
                         onClick={handleTest}
-                        disabled={testing || !config.clientId || !config.clientSecret || !config.developerToken || !config.refreshToken}
+                        disabled={testing || !config.sheetCsvUrl}
                         className="g-btn-secondary"
-                        style={{ width: "100%", justifyContent: "center", padding: "0.6rem", fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: "0.4rem", opacity: (testing || !config.clientId || !config.clientSecret || !config.developerToken || !config.refreshToken) ? 0.5 : 1 }}
+                        style={{ width: "100%", justifyContent: "center", padding: "0.6rem", fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: "0.4rem", opacity: (testing || !config.sheetCsvUrl) ? 0.5 : 1 }}
                     >
                         {testing ? <Loader2 className="g-pulse" style={{ width: 14, height: 14 }} /> : <PlugZap style={{ width: 14, height: 14 }} />}
-                        {testing ? "Testando..." : "Testar conexão"}
+                        {testing ? "Testando..." : "Testar planilha"}
                     </button>
 
                     {testResult && (
@@ -162,7 +139,7 @@ export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSa
                                 <div style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start" }}>
                                     <CircleCheck style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1 }} />
                                     <span>
-                                        Conectado! Customer IDs acessíveis: {testResult.customerIds.length ? testResult.customerIds.join(", ") : "nenhum (revise o Login Customer ID / permissões do MCC)"}
+                                        Lida! {testResult.rowCount} linhas · {testResult.accountCount} contas ({testResult.accountNames.join(", ")}) · {testResult.dateFrom} a {testResult.dateTo}
                                     </span>
                                 </div>
                             ) : (
@@ -178,7 +155,7 @@ export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSa
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
                     {isConfigured ? (
                         <button onClick={handleClear} className="g-btn-secondary" style={{ color: "#f87171", borderColor: "rgba(248,113,113,0.3)", padding: "0.5rem 0.75rem", fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-                            <Trash2 style={{ width: 13, height: 13 }} /> Limpar tudo
+                            <Trash2 style={{ width: 13, height: 13 }} /> Limpar
                         </button>
                     ) : <div />}
 

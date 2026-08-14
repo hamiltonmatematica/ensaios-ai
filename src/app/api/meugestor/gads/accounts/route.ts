@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     try {
         const creds = getGoogleAdsCreds(request);
         if (!creds) {
-            return NextResponse.json({ success: false, error: 'Credenciais do Google Ads não configuradas.' }, { status: 400 });
+            return NextResponse.json({ success: false, error: 'URL da planilha do Google Ads não configurada.' }, { status: 400 });
         }
 
         const { searchParams } = new URL(request.url);

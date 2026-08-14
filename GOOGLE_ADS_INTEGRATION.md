@@ -1,4 +1,6 @@
-# Integração Google Ads no meugestor — Roadmap
+# Integração Google Ads no meugestor — Roadmap (histórico)
+
+> **Abandonado em favor de uma arquitetura mais simples.** Este roadmap (OAuth2 + Developer Token + API oficial do Google Ads) foi implementado, mas esbarrou em: contas Google bloqueadas pra criar app no Cloud, a UI "Google Auth Platform" nova do console, e por fim erros de permissão por hierarquia de MCC (`login-customer-id` não resolve automaticamente pra contas em sub-MCCs diferentes). Trocamos para uma leitura via **Google Ads Script → Google Sheets publicada como CSV** — sem OAuth, sem developer token, sem Google Cloud. Veja [GOOGLE_ADS_SETUP.md](GOOGLE_ADS_SETUP.md) e [`scripts/google-ads-export.gs`](scripts/google-ads-export.gs) para a arquitetura atual. O conteúdo abaixo fica só como histórico/referência.
 
 Roadmap honesto para adicionar Google Ads ao meugestor, espelhando a arquitetura já existente do Meta Ads. **Nenhum código foi escrito ainda — este documento é o plano.**
 

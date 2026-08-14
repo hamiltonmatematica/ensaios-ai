@@ -1,64 +1,49 @@
-# Google Ads — como pegar as credenciais (passo a passo)
+# Google Ads — como conectar (via planilha, sem OAuth)
 
-Guia manual para obter tudo que a integração Google Ads do meugestor vai precisar. Não envolve escrever código — é só clicar nas telas do Google. Quando terminar, preencha os valores direto na tela do meugestor (botão **"Google Ads"** no topo do dashboard, ao lado do botão de token da Meta) — igual você já faz hoje com o token da Meta.
+Depois de esbarrar em bloqueios de criação de app no Google Cloud, hierarquia de MCC e erros genéricos de autenticação da API do Google Ads, trocamos de arquitetura: em vez de OAuth2 + Developer Token + API do Google Ads, um **Google Ads Script roda dentro da sua conta** (sem nenhuma credencial nossa) e exporta as métricas diárias pra uma Google Sheets. O meugestor só lê essa planilha.
 
-Veja também [GOOGLE_ADS_INTEGRATION.md](GOOGLE_ADS_INTEGRATION.md) para o roadmap técnico de como o código vai usar essas credenciais.
+Vantagens: zero Google Cloud, zero developer token, zero problema de hierarquia de MCC — o script roda com a sua própria sessão logada, então enxerga exatamente as contas que você já gerencia. Desvantagem: os dados atualizam no ritmo que você configurar (recomendado: 1x por dia), não em tempo real.
 
-> **Sua conta bloqueia a criação de app/projeto no Google Cloud?** Sem problema — o projeto do Google Cloud (passo 1) e o MCC do Google Ads (passo 2) **não precisam ser a mesma conta Google**. Use uma conta secundária qualquer (até um Gmail pessoal novo, sem nenhum vínculo com o MCC) só para criar o projeto e gerar o Client ID/Secret no passo 1. O Developer Token continua vindo do MCC de sempre (passo 2), e no passo 3 você loga com a conta do MCC (não com a secundária) pra autorizar — é essa autorização que gera o Refresh Token vinculado à conta certa. O passo a passo abaixo já indica onde trocar de conta.
+Veja também [GOOGLE_ADS_INTEGRATION.md](GOOGLE_ADS_INTEGRATION.md) para o histórico da tentativa anterior (via API oficial) e por que trocamos.
 
-## 1) Google Cloud — criar as credenciais OAuth
+## 1) Criar a planilha
 
-> Use aqui a **conta secundária** (a que não está bloqueada), se for o seu caso. Se sua conta principal cria projetos normalmente, pode usar ela mesma — não muda nada no resto do processo.
+1. Acesse [sheets.google.com](https://sheets.google.com) e crie uma planilha em branco (pode deixar sem nome ou nomear "Meu Gestor — Google Ads").
+2. Copie a URL da planilha (barra de endereço do navegador) — algo como `https://docs.google.com/spreadsheets/d/1AbC.../edit`.
 
-> **Nota**: o Google renomeou essa área do console para **"Google Auth Platform"** (a antiga "Tela de consentimento OAuth"). Os nomes dos menus abaixo já refletem a UI nova — se você ver nomes diferentes, é a UI antiga, mas o conceito é o mesmo.
+## 2) Colar o script no Google Ads
 
-1. Acesse [console.cloud.google.com](https://console.cloud.google.com), logado com a conta escolhida para este passo, e crie um projeto novo (ou use um existente).
-2. Menu **APIs e Serviços → Biblioteca** → procure **"Google Ads API"** → clique **Ativar**.
-3. Vá em **Google Auth Platform → Público-alvo** (Audience):
-   - Tipo de público: **Externo**.
-   - Em **"Usuários de teste"** (Test users), clique em **Adicionar usuários** e adicione o **e-mail que administra o MCC** (mesmo que seja diferente da conta que está criando o projeto agora). Enquanto o app estiver em modo "Testing", só esse e-mail consegue autorizar no passo 3 — se esquecer desse detalhe, a autorização falha.
-4. Vá em **Google Auth Platform → Branding** e preencha nome do app, e-mail de suporte, e-mail do desenvolvedor (obrigatório antes de conseguir criar o cliente).
-5. Vá em **Google Auth Platform → Clientes** (Clients) → **Criar cliente OAuth**:
-   - Tipo de aplicativo: **Aplicativo da Web**.
-   - Em "URIs de redirecionamento autorizados", adicione: `https://developers.google.com/oauthplayground`
-   - Salve e copie o **Client ID** e o **Client Secret** → vão em `GOOGLE_ADS_CLIENT_ID` e `GOOGLE_ADS_CLIENT_SECRET`.
+1. Entre no [Google Ads](https://ads.google.com) **com a conta MCC** (a que enxerga todas as contas de cliente que você gerencia).
+2. Vá em **Ferramentas e configurações (ícone de chave inglesa) → Ações em massa → Scripts**.
+3. Clique em **+ Novo script**.
+4. Apague o conteúdo padrão e cole o conteúdo de [`scripts/google-ads-export.gs`](scripts/google-ads-export.gs) deste repositório.
+5. Na linha `var SHEET_URL = 'COLE_AQUI_A_URL_DA_SUA_GOOGLE_SHEETS';`, troque pelo URL copiado no passo 1.
+6. Clique em **Salvar**.
 
-## 2) MCC — pedir o Developer Token
+## 3) Rodar e autorizar
 
-1. Entre no [Google Ads](https://ads.google.com) com a conta que administra o MCC.
-2. Vá em **Ferramentas e configurações (ícone de chave inglesa) → Configuração → API Center**.
-3. Copie o **Developer Token** que aparece lá → vai em `GOOGLE_ADS_DEVELOPER_TOKEN`. Nasce em nível **Test**, funciona só com contas de teste do Ads por enquanto.
-4. Nessa mesma tela tem um link/formulário para solicitar acesso **Basic** (contas reais) — preencha e envie. É o item mais demorado (dias a semanas), então vale pedir agora e seguir usando conta de teste enquanto espera.
+1. Clique em **Visualizar** (ou **Executar**) — na primeira vez o Google vai pedir autorização (é a sua própria conta Google autorizando o próprio script, não um app externo). Aceite.
+2. Depois de rodar, abra a planilha — deve ter uma aba **"dados"** com colunas `date, account_id, account_name, cost, impressions, clicks, conversions`, uma linha por dia por conta (últimos 90 dias).
+3. Se der erro em alguma conta específica, o script pula ela e continua as outras — confira o log (aba "Registros de execução") pra ver quais.
 
-## 3) Pegar o Refresh Token
+## 4) Agendar execução diária
 
-Use o **OAuth Playground do Google** — ferramenta oficial feita exatamente pra isso, sem precisar escrever código:
+1. Ainda na tela do script, clique em **Frequência** (ou no ícone de relógio).
+2. Configure **Diariamente**, no horário que preferir (ex: 6h da manhã).
+3. Salve. A partir daí a planilha se atualiza sozinha todo dia, sem você precisar tocar em nada.
 
-1. Acesse [developers.google.com/oauthplayground](https://developers.google.com/oauthplayground).
-2. Clique no ícone de engrenagem (⚙️) no canto superior direito → marque **"Use your own OAuth credentials"** → cole o Client ID e Client Secret do passo 1.
-3. Na coluna da esquerda, no campo "Input your own scopes", cole: `https://www.googleapis.com/auth/adwords` → clique **Authorize APIs**.
-4. **Importante**: faça login com a conta que **administra o MCC** — não com a conta secundária usada no passo 1, caso sejam contas diferentes. É essa conta que precisa aceitar a permissão.
-5. De volta no Playground, clique **Exchange authorization code for tokens**.
-6. Copie o **Refresh token** (string longa começando com `1//`) → vai em `GOOGLE_ADS_REFRESH_TOKEN`. Não expira até você revogar o acesso — é o token que o app vai usar pra sempre gerar novos access tokens sozinho.
+## 5) Publicar a planilha como CSV
 
-## 4) Achar os IDs de conta
+1. Na planilha, abra a aba **"dados"**.
+2. Menu **Arquivo → Compartilhar → Publicar na web**.
+3. Em "Link", selecione a aba **"dados"** (não "Todo o documento") e o formato **CSV**.
+4. Clique em **Publicar** → confirme.
+5. Copie o link gerado (algo como `https://docs.google.com/spreadsheets/d/e/2PACX-.../pub?gid=0&single=true&output=csv`).
 
-- **Login Customer ID**: o ID do seu MCC (aparece no canto superior direito do Google Ads quando logado nele), formato `123-456-7890` — remova os traços → vai em `GOOGLE_ADS_LOGIN_CUSTOMER_ID`.
-- **Customer ID**: o ID da conta de anúncios específica que você quer gerenciar (mesma lógica, sem traços) → vai em `GOOGLE_ADS_CUSTOMER_ID`.
+**Nota de privacidade**: "Publicar na web" deixa esse link acessível a qualquer pessoa que o tenha (não aparece em buscas, mas não tem senha) — como o conteúdo é só gasto/cliques/impressões/conversões por conta (sem dados de clientes finais), o risco é baixo, mas não compartilhe esse link publicamente.
 
-## Onde colocar
+## 6) Colar no meugestor
 
-No meugestor (já publicado), clique no botão **"Google Ads"** no topo do dashboard. Abre um modal com 6 campos:
+No meugestor, clique no botão **"Google Ads"** no topo do dashboard → cole o link do CSV do passo anterior → **Testar planilha** (confirma que está lendo certo) → **Salvar**.
 
-- Client ID
-- Client Secret
-- Developer Token
-- Refresh Token
-- Login Customer ID (MCC)
-- Customer ID (conta a gerenciar)
-
-Preenche e clica em **Salvar**. Fica guardado no localStorage do seu navegador (mesmo mecanismo do token da Meta hoje) e é enviado automaticamente nas chamadas à API assim que o backend do Google Ads existir. Nada disso deve ser colado no chat.
-
-**Nota de segurança**: diferente do token da Meta (que só dá acesso a uma conta de anúncios), o Client Secret e o Developer Token são credenciais mais "de sistema" — dão acesso amplo ao seu app Google Cloud e à API do Google Ads como um todo. Guardá-los no navegador é mais exposto a risco (ex.: XSS) do que mantê-los só no servidor. Foi uma escolha consciente pra manter a mesma UX do token da Meta; se um dia quiser reforçar a segurança, dá pra mover Client ID/Secret/Developer Token pro `.env` do servidor e deixar só o Refresh Token + Customer IDs no navegador.
-
-Quando estiver tudo preenchido, é só avisar que eu escrevo o `src/lib/google-ads.ts` (Fase 2 do roadmap) espelhando o `src/lib/facebook.ts` que já existe, lendo essas credenciais dos headers (`x-google-ads-*`) que o frontend já está enviando, pra você ver os dados do Google Ads no mesmo dashboard do meugestor.
+Pronto — as contas do Google Ads aparecem na mesma lista das contas Meta, com o total do período selecionado e comparação com o período anterior, exatamente como já funciona pro Meta.
