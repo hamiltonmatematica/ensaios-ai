@@ -70,11 +70,13 @@ function buildHeaders(accessToken: string, creds: GoogleAdsCreds): HeadersInit {
  * Lista os customer IDs acessíveis pelo refresh token — chamada mais simples
  * da API, ideal para validar se Client ID/Secret + Developer Token + Refresh
  * Token estão corretos, sem precisar de um Customer ID específico.
+ * Aceita um access token já obtido para evitar renovar de novo (ex: quando
+ * chamada em sequência com outras consultas na mesma requisição).
  */
-export async function listAccessibleCustomers(creds: GoogleAdsCreds): Promise<string[]> {
-    const accessToken = await getGoogleAdsAccessToken(creds);
+export async function listAccessibleCustomers(creds: GoogleAdsCreds, accessToken?: string): Promise<string[]> {
+    const token = accessToken || await getGoogleAdsAccessToken(creds);
     const res = await fetch(`${GOOGLE_ADS_API_URL}/customers:listAccessibleCustomers`, {
-        headers: buildHeaders(accessToken, creds),
+        headers: buildHeaders(token, creds),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -85,13 +87,16 @@ export async function listAccessibleCustomers(creds: GoogleAdsCreds): Promise<st
     return resourceNames.map(rn => rn.replace('customers/', ''));
 }
 
-/** Executa uma query GAQL contra um customer específico (base para relatórios/insights). */
-export async function gaqlSearch(creds: GoogleAdsCreds, customerId: string, query: string): Promise<any[]> {
-    const accessToken = await getGoogleAdsAccessToken(creds);
+/**
+ * Executa uma query GAQL contra um customer específico (base para relatórios/insights).
+ * Aceita um access token já obtido (ver listAccessibleCustomers) pelo mesmo motivo.
+ */
+export async function gaqlSearch(creds: GoogleAdsCreds, customerId: string, query: string, accessToken?: string): Promise<any[]> {
+    const token = accessToken || await getGoogleAdsAccessToken(creds);
     const cleanCustomerId = customerId.replace(/-/g, '');
     const res = await fetch(`${GOOGLE_ADS_API_URL}/customers/${cleanCustomerId}/googleAds:search`, {
         method: 'POST',
-        headers: buildHeaders(accessToken, creds),
+        headers: buildHeaders(token, creds),
         body: JSON.stringify({ query }),
     });
     const data = await res.json().catch(() => ({}));
@@ -120,7 +125,7 @@ interface RawCustomerMetrics {
 }
 
 /** Totais da conta (customer) num período — 1 linha agregada via GAQL (sem segments.date no SELECT). */
-async function getCustomerMetrics(creds: GoogleAdsCreds, customerId: string, range: DateRange): Promise<RawCustomerMetrics> {
+async function getCustomerMetrics(creds: GoogleAdsCreds, customerId: string, range: DateRange, accessToken: string): Promise<RawCustomerMetrics> {
     const query = `
         SELECT
           customer.descriptive_name,
@@ -133,7 +138,7 @@ async function getCustomerMetrics(creds: GoogleAdsCreds, customerId: string, ran
         FROM customer
         WHERE segments.date BETWEEN '${range.since}' AND '${range.until}'
     `;
-    const results = await gaqlSearch(creds, customerId, query);
+    const results = await gaqlSearch(creds, customerId, query, accessToken);
     const row = results[0];
     return {
         customerId,
@@ -167,57 +172,71 @@ function pctDelta(curr: number, prev: number): number | null {
  * para poderem ser exibidas juntas na mesma InsightsTable do dashboard.
  * Sem escrita/gestão — só os números do período (foco em relatório).
  */
+const BATCH_SIZE = 5;
+
 export async function listGoogleAdsAccountRows(
     creds: GoogleAdsCreds,
     range: DateRange,
     prevRange: DateRange | null,
 ): Promise<any[]> {
-    const customerIds = creds.customerId ? [creds.customerId] : await listAccessibleCustomers(creds);
+    // Um único access token pra toda a requisição — evita disparar dezenas de
+    // renovações simultâneas (uma por conta x período), que o Google costuma
+    // recusar com um erro de autenticação genérico quando em rajada.
+    const accessToken = await getGoogleAdsAccessToken(creds);
+    const customerIds = creds.customerId ? [creds.customerId] : await listAccessibleCustomers(creds, accessToken);
 
-    const settled = await Promise.allSettled(customerIds.map(async (customerId) => {
-        const [currRaw, prevRaw] = await Promise.all([
-            getCustomerMetrics(creds, customerId, range),
-            prevRange ? getCustomerMetrics(creds, customerId, prevRange).catch(() => null) : Promise.resolve(null),
-        ]);
-        const curr = deriveMetrics(currRaw);
-        const prev = prevRaw ? deriveMetrics(prevRaw) : null;
+    const fulfilled: any[] = [];
+    const rejections: any[] = [];
 
-        const deltas = prev ? {
-            spend: pctDelta(curr.spend, prev.spend),
-            impressions: pctDelta(curr.impressions, prev.impressions),
-            clicks: pctDelta(curr.clicks, prev.clicks),
-            ctr: pctDelta(curr.ctr, prev.ctr),
-            cpc: pctDelta(curr.cpc, prev.cpc),
-            cpm: pctDelta(curr.cpm, prev.cpm),
-            leads: pctDelta(curr.leads, prev.leads),
-            cpl: pctDelta(curr.cpl, prev.cpl),
-        } : null;
+    for (let i = 0; i < customerIds.length; i += BATCH_SIZE) {
+        const batch = customerIds.slice(i, i + BATCH_SIZE);
+        const settled = await Promise.allSettled(batch.map(async (customerId) => {
+            const [currRaw, prevRaw] = await Promise.all([
+                getCustomerMetrics(creds, customerId, range, accessToken),
+                prevRange ? getCustomerMetrics(creds, customerId, prevRange, accessToken).catch(() => null) : Promise.resolve(null),
+            ]);
+            const curr = deriveMetrics(currRaw);
+            const prev = prevRaw ? deriveMetrics(prevRaw) : null;
 
-        return {
-            id: `google:${customerId}`,
-            source: 'google',
-            name: currRaw.name,
-            account_id: customerId,
-            currency: currRaw.currency,
-            ...curr,
-            purchases: 0, purchase_value: 0, roas: 0, messaging_started: 0, reach: 0, frequency: 0,
-            has_any_ads: curr.spend > 0 || curr.impressions > 0,
-            has_ads_in_period: curr.spend > 0,
-            issues: [] as string[],
-            issue_categories: [] as string[],
-            previous: prev,
-            deltas,
-            health: undefined,
-        };
-    }));
+            const deltas = prev ? {
+                spend: pctDelta(curr.spend, prev.spend),
+                impressions: pctDelta(curr.impressions, prev.impressions),
+                clicks: pctDelta(curr.clicks, prev.clicks),
+                ctr: pctDelta(curr.ctr, prev.ctr),
+                cpc: pctDelta(curr.cpc, prev.cpc),
+                cpm: pctDelta(curr.cpm, prev.cpm),
+                leads: pctDelta(curr.leads, prev.leads),
+                cpl: pctDelta(curr.cpl, prev.cpl),
+            } : null;
 
-    const fulfilled = settled.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => r.value);
+            return {
+                id: `google:${customerId}`,
+                source: 'google',
+                name: currRaw.name,
+                account_id: customerId,
+                currency: currRaw.currency,
+                ...curr,
+                purchases: 0, purchase_value: 0, roas: 0, messaging_started: 0, reach: 0, frequency: 0,
+                has_any_ads: curr.spend > 0 || curr.impressions > 0,
+                has_ads_in_period: curr.spend > 0,
+                issues: [] as string[],
+                issue_categories: [] as string[],
+                previous: prev,
+                deltas,
+                health: undefined,
+            };
+        }));
+
+        for (const r of settled) {
+            if (r.status === 'fulfilled') fulfilled.push(r.value);
+            else rejections.push(r.reason);
+        }
+    }
 
     // Se TODAS as contas falharam, é sinal de credencial/config quebrada — propaga o
     // erro real em vez de devolver uma lista vazia (que pareceria "sem contas").
     if (fulfilled.length === 0 && customerIds.length > 0) {
-        const firstRejection = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
-        const reason = firstRejection?.reason;
+        const reason = rejections[0];
         throw reason instanceof Error ? reason : new Error(String(reason || 'Falha ao buscar contas do Google Ads'));
     }
 
