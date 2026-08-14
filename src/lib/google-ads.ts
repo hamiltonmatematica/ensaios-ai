@@ -101,3 +101,125 @@ export async function gaqlSearch(creds: GoogleAdsCreds, customerId: string, quer
     }
     return data.results || [];
 }
+
+// ─────────────────────────────────────────────────────────────
+// MÉTRICAS DE CONTA (leitura/relatórios)
+// ─────────────────────────────────────────────────────────────
+
+export interface DateRange { since: string; until: string; }
+
+interface RawCustomerMetrics {
+    customerId: string;
+    name: string;
+    currency: string;
+    spend: number;
+    impressions: number;
+    clicks: number;
+    conversions: number;
+    conversionsValue: number;
+}
+
+/** Totais da conta (customer) num período — 1 linha agregada via GAQL (sem segments.date no SELECT). */
+async function getCustomerMetrics(creds: GoogleAdsCreds, customerId: string, range: DateRange): Promise<RawCustomerMetrics> {
+    const query = `
+        SELECT
+          customer.descriptive_name,
+          customer.currency_code,
+          metrics.cost_micros,
+          metrics.impressions,
+          metrics.clicks,
+          metrics.conversions,
+          metrics.conversions_value
+        FROM customer
+        WHERE segments.date BETWEEN '${range.since}' AND '${range.until}'
+    `;
+    const results = await gaqlSearch(creds, customerId, query);
+    const row = results[0];
+    return {
+        customerId,
+        name: row?.customer?.descriptiveName || customerId,
+        currency: row?.customer?.currencyCode || 'BRL',
+        spend: Number(row?.metrics?.costMicros || 0) / 1_000_000,
+        impressions: Number(row?.metrics?.impressions || 0),
+        clicks: Number(row?.metrics?.clicks || 0),
+        conversions: Number(row?.metrics?.conversions || 0),
+        conversionsValue: Number(row?.metrics?.conversionsValue || 0),
+    };
+}
+
+function deriveMetrics(m: RawCustomerMetrics) {
+    const { spend, impressions, clicks, conversions } = m;
+    const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+    const cpc = clicks > 0 ? spend / clicks : 0;
+    const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
+    const leads = conversions;
+    const cpl = leads > 0 ? spend / leads : 0;
+    return { spend, impressions, clicks, ctr, cpc, cpm, leads, cpl };
+}
+
+function pctDelta(curr: number, prev: number): number | null {
+    return prev > 0 ? ((curr - prev) / prev) * 100 : null;
+}
+
+/**
+ * Monta as linhas de conta do Google Ads no mesmo formato usado pelas linhas
+ * do Meta (spend/impressions/clicks/ctr/cpc/cpm/leads/cpl/previous/deltas),
+ * para poderem ser exibidas juntas na mesma InsightsTable do dashboard.
+ * Sem escrita/gestão — só os números do período (foco em relatório).
+ */
+export async function listGoogleAdsAccountRows(
+    creds: GoogleAdsCreds,
+    range: DateRange,
+    prevRange: DateRange | null,
+): Promise<any[]> {
+    const customerIds = creds.customerId ? [creds.customerId] : await listAccessibleCustomers(creds);
+
+    const settled = await Promise.allSettled(customerIds.map(async (customerId) => {
+        const [currRaw, prevRaw] = await Promise.all([
+            getCustomerMetrics(creds, customerId, range),
+            prevRange ? getCustomerMetrics(creds, customerId, prevRange).catch(() => null) : Promise.resolve(null),
+        ]);
+        const curr = deriveMetrics(currRaw);
+        const prev = prevRaw ? deriveMetrics(prevRaw) : null;
+
+        const deltas = prev ? {
+            spend: pctDelta(curr.spend, prev.spend),
+            impressions: pctDelta(curr.impressions, prev.impressions),
+            clicks: pctDelta(curr.clicks, prev.clicks),
+            ctr: pctDelta(curr.ctr, prev.ctr),
+            cpc: pctDelta(curr.cpc, prev.cpc),
+            cpm: pctDelta(curr.cpm, prev.cpm),
+            leads: pctDelta(curr.leads, prev.leads),
+            cpl: pctDelta(curr.cpl, prev.cpl),
+        } : null;
+
+        return {
+            id: `google:${customerId}`,
+            source: 'google',
+            name: currRaw.name,
+            account_id: customerId,
+            currency: currRaw.currency,
+            ...curr,
+            purchases: 0, purchase_value: 0, roas: 0, messaging_started: 0, reach: 0, frequency: 0,
+            has_any_ads: curr.spend > 0 || curr.impressions > 0,
+            has_ads_in_period: curr.spend > 0,
+            issues: [] as string[],
+            issue_categories: [] as string[],
+            previous: prev,
+            deltas,
+            health: undefined,
+        };
+    }));
+
+    const fulfilled = settled.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => r.value);
+
+    // Se TODAS as contas falharam, é sinal de credencial/config quebrada — propaga o
+    // erro real em vez de devolver uma lista vazia (que pareceria "sem contas").
+    if (fulfilled.length === 0 && customerIds.length > 0) {
+        const firstRejection = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+        const reason = firstRejection?.reason;
+        throw reason instanceof Error ? reason : new Error(String(reason || 'Falha ao buscar contas do Google Ads'));
+    }
+
+    return fulfilled;
+}

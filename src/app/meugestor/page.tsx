@@ -103,6 +103,7 @@ export default function MeuGestorDashboard() {
     const [periodMeta, setPeriodMeta] = useState<PeriodMeta>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [googleAdsError, setGoogleAdsError] = useState<string | null>(null);
 
     const [accountDetail, setAccountDetail] = useState<{ campaigns: any[]; daily: any[]; adsets: any[] } | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
@@ -222,22 +223,40 @@ export default function MeuGestorDashboard() {
         accountsAbortRef.current?.abort();
         const ctrl = new AbortController();
         accountsAbortRef.current = ctrl;
-        setLoading(true); setError(null);
+        setLoading(true); setError(null); setGoogleAdsError(null);
         try {
-            const res = await fetch(`/api/meugestor/accounts?${buildPeriodParams().toString()}`, {
-                headers: getApiHeaders(),
-                signal: ctrl.signal,
-            });
-            const json = await res.json();
-            if (!json.success) throw new Error(json.error || "Erro ao buscar contas");
-            setAccounts(json.data);
-            setPeriodMeta(json.period);
+            const params = buildPeriodParams().toString();
+            const hasGoogleCreds = !!(googleAdsConfig.clientId && googleAdsConfig.clientSecret && googleAdsConfig.developerToken && googleAdsConfig.refreshToken);
+
+            const metaPromise = fetch(`/api/meugestor/accounts?${params}`, {
+                headers: getApiHeaders(), signal: ctrl.signal,
+            }).then(r => r.json());
+
+            const googlePromise = hasGoogleCreds
+                ? fetch(`/api/meugestor/gads/accounts?${params}`, { headers: getApiHeaders(), signal: ctrl.signal })
+                    .then(r => r.json())
+                    .catch((e: any) => (e.name === "AbortError" ? null : { success: false, error: e.message }))
+                : Promise.resolve(null);
+
+            const [metaJson, googleJson] = await Promise.all([metaPromise, googlePromise]);
+
+            if (!metaJson.success) throw new Error(metaJson.error || "Erro ao buscar contas");
+            const metaRows = metaJson.data.map((a: any) => ({ ...a, source: "meta" }));
+
+            let allRows = metaRows;
+            if (googleJson) {
+                if (googleJson.success) allRows = [...metaRows, ...googleJson.data];
+                else setGoogleAdsError(googleJson.error || "Erro ao buscar contas do Google Ads");
+            }
+
+            setAccounts(allRows);
+            setPeriodMeta(metaJson.period);
         } catch (e: any) {
             if (e.name !== "AbortError") setError(e.message);
         } finally {
             if (accountsAbortRef.current === ctrl) setLoading(false);
         }
-    }, [buildPeriodParams, getApiHeaders]);
+    }, [buildPeriodParams, getApiHeaders, googleAdsConfig]);
 
     useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
 
@@ -294,9 +313,9 @@ export default function MeuGestorDashboard() {
         }
     }, [buildPeriodParams, getApiHeaders]);
 
-    // re-busca detalhes ao mudar período
+    // re-busca detalhes ao mudar período (contas Google ainda não têm detalhamento por campanha)
     useEffect(() => {
-        if (selectedAccountId) fetchAccountDetail(selectedAccountId);
+        if (selectedAccountId && !selectedAccountId.startsWith("google:")) fetchAccountDetail(selectedAccountId);
     }, [selectedAccountId, fetchAccountDetail]);
     useEffect(() => {
         if (selectedCampaignId) fetchCampaignDetail(selectedCampaignId);
@@ -789,6 +808,16 @@ export default function MeuGestorDashboard() {
                                         })}
                                     </div>
                                 )}
+                                {googleAdsError && (
+                                    <div style={{
+                                        margin: "0 0 0.75rem", padding: "0.6rem 0.85rem", borderRadius: "0.5rem", fontSize: "0.75rem",
+                                        background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", color: "#f87171",
+                                        display: "flex", alignItems: "center", gap: "0.4rem",
+                                    }}>
+                                        <Globe style={{ width: 13, height: 13, flexShrink: 0 }} />
+                                        <span>Falha ao buscar contas do Google Ads: {googleAdsError}</span>
+                                    </div>
+                                )}
                                 <InsightsTable
                                     rows={visibleAccounts}
                                     selectedMetrics={accountMetrics}
@@ -798,7 +827,20 @@ export default function MeuGestorDashboard() {
                                     onToggleFavorite={toggleFavorite}
                                     onOpenMetricsPicker={() => setPickerOpen("account")}
                                     extraColumnsLeft={[{
+                                        key: "platform", label: "Plataforma", render: (r: any) => (
+                                            r.source === "google" ? (
+                                                <span className="g-badge" style={{ fontSize: "0.6rem", background: "rgba(66,133,244,0.18)", color: "#8ab4f8", border: "1px solid rgba(66,133,244,0.4)" }}>
+                                                    <Globe style={{ width: 10, height: 10, marginRight: 3 }} /> Google
+                                                </span>
+                                            ) : (
+                                                <span className="g-badge" style={{ fontSize: "0.6rem", background: "rgba(76,110,245,0.18)", color: "#748ffc", border: "1px solid rgba(76,110,245,0.4)" }}>
+                                                    Meta
+                                                </span>
+                                            )
+                                        ),
+                                    }, {
                                         key: "status", label: "Status", render: (r: any) => {
+                                            if (r.source === "google") return null;
                                             const sev = r.severity || (r.account_status === 1 ? "ok" : "warn");
                                             const badgeClass = sev === "ok" ? "g-badge-success" : sev === "danger" ? "g-badge-danger" : "g-badge-warning";
                                             const issues: string[] = Array.isArray(r.issues) ? r.issues : [];
@@ -823,8 +865,19 @@ export default function MeuGestorDashboard() {
                         </div>
                     )}
 
-                    {/* ========== ACCOUNT DETAIL ========== */}
-                    {selectedAccountId && selectedAccount && !selectedCampaignId && !selectedAdId && (
+                    {/* ========== ACCOUNT DETAIL (GOOGLE — sem campanha ainda) ========== */}
+                    {selectedAccountId && selectedAccount && selectedAccount.source === "google" && !selectedCampaignId && !selectedAdId && (
+                        <div className="g-fade-in" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                            <KpiGrid ctx="account" row={selectedAccount} selected={["spend", "impressions", "clicks", "ctr", "cpc", "cpm", "leads", "cpl"]} />
+                            <div className="g-glass" style={{ padding: "1.5rem", borderRadius: "0.75rem", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: "0.82rem" }}>
+                                <Globe style={{ width: 24, height: 24, margin: "0 auto 0.5rem", color: "#8ab4f8" }} />
+                                Detalhamento por campanha do Google Ads ainda não implementado — por enquanto só o total da conta no período.
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ========== ACCOUNT DETAIL (META) ========== */}
+                    {selectedAccountId && selectedAccount && selectedAccount.source !== "google" && !selectedCampaignId && !selectedAdId && (
                         <div className="g-fade-in" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                             {/* Ferramentas de gestão da conta */}
                             <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
