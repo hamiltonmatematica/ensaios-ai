@@ -183,7 +183,17 @@ export async function listGoogleAdsAccountRows(
     // renovações simultâneas (uma por conta x período), que o Google costuma
     // recusar com um erro de autenticação genérico quando em rajada.
     const accessToken = await getGoogleAdsAccessToken(creds);
-    const customerIds = creds.customerId ? [creds.customerId] : await listAccessibleCustomers(creds, accessToken);
+
+    let customerIds: string[];
+    if (creds.customerId) {
+        customerIds = [creds.customerId];
+    } else {
+        try {
+            customerIds = await listAccessibleCustomers(creds, accessToken);
+        } catch (e: any) {
+            throw new Error(`Falha ao listar contas acessíveis: ${e.message}`);
+        }
+    }
 
     const fulfilled: any[] = [];
     const rejections: any[] = [];
@@ -191,10 +201,15 @@ export async function listGoogleAdsAccountRows(
     for (let i = 0; i < customerIds.length; i += BATCH_SIZE) {
         const batch = customerIds.slice(i, i + BATCH_SIZE);
         const settled = await Promise.allSettled(batch.map(async (customerId) => {
-            const [currRaw, prevRaw] = await Promise.all([
-                getCustomerMetrics(creds, customerId, range, accessToken),
-                prevRange ? getCustomerMetrics(creds, customerId, prevRange, accessToken).catch(() => null) : Promise.resolve(null),
-            ]);
+            let currRaw: RawCustomerMetrics, prevRaw: RawCustomerMetrics | null;
+            try {
+                [currRaw, prevRaw] = await Promise.all([
+                    getCustomerMetrics(creds, customerId, range, accessToken),
+                    prevRange ? getCustomerMetrics(creds, customerId, prevRange, accessToken).catch(() => null) : Promise.resolve(null),
+                ]);
+            } catch (e: any) {
+                throw new Error(`Conta ${customerId}: ${e.message}`);
+            }
             const curr = deriveMetrics(currRaw);
             const prev = prevRaw ? deriveMetrics(prevRaw) : null;
 
@@ -234,10 +249,12 @@ export async function listGoogleAdsAccountRows(
     }
 
     // Se TODAS as contas falharam, é sinal de credencial/config quebrada — propaga o
-    // erro real em vez de devolver uma lista vazia (que pareceria "sem contas").
+    // erro real (com o id da conta) em vez de devolver uma lista vazia (que
+    // pareceria "sem contas"). Mostra até 3 mensagens distintas para ajudar a
+    // diagnosticar se é um problema sistêmico ou específico de algumas contas.
     if (fulfilled.length === 0 && customerIds.length > 0) {
-        const reason = rejections[0];
-        throw reason instanceof Error ? reason : new Error(String(reason || 'Falha ao buscar contas do Google Ads'));
+        const messages = Array.from(new Set(rejections.map(r => (r instanceof Error ? r.message : String(r))))).slice(0, 3);
+        throw new Error(messages.join(' | ') || 'Falha ao buscar contas do Google Ads');
     }
 
     return fulfilled;
