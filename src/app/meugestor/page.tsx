@@ -678,11 +678,11 @@ export default function MeuGestorDashboard() {
                             style={{
                                 display: "inline-flex", alignItems: "center", gap: "0.4rem",
                                 padding: "0.5rem 0.75rem", fontSize: "0.75rem",
-                                borderColor: googleAdsConfig.sheetCsvUrl ? "rgba(52,211,153,0.6)" : undefined,
-                                color: googleAdsConfig.sheetCsvUrl ? "#34d399" : undefined,
+                                borderColor: googleAdsConfig.sheetCsvUrls.length ? "rgba(52,211,153,0.6)" : undefined,
+                                color: googleAdsConfig.sheetCsvUrls.length ? "#34d399" : undefined,
                             }}>
                             <Globe style={{ width: 13, height: 13 }} />
-                            <span>{googleAdsConfig.sheetCsvUrl ? "Google Ads Ativo" : "Google Ads"}</span>
+                            <span>{googleAdsConfig.sheetCsvUrls.length ? "Google Ads Ativo" : "Google Ads"}</span>
                         </button>
                         <DateRangePicker value={period} onChange={setPeriod} compare={compare} onCompareChange={setCompare} />
                         <ExportMenu
