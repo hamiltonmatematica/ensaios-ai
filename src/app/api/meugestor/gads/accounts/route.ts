@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     try {
         const creds = getGoogleAdsCreds(request);
         if (!creds) {
-            return NextResponse.json({ success: false, error: 'URL da planilha do Google Ads não configurada.' }, { status: 400 });
+            return NextResponse.json({ success: false, error: 'Nenhuma URL de planilha do Google Ads configurada.' }, { status: 400 });
         }
 
         const { searchParams } = new URL(request.url);
@@ -34,9 +34,15 @@ export async function GET(request: NextRequest) {
         }
         const prev = compare ? previousRange(range) : null;
 
-        const rows = await listGoogleAdsAccountRows(creds, range, prev);
+        const { rows, errors } = await listGoogleAdsAccountRows(creds, range, prev);
 
-        return NextResponse.json({ success: true, data: rows });
+        return NextResponse.json({
+            success: true,
+            data: rows,
+            // Erros parciais (ex: uma das planilhas de MCC falhou, mas as outras vieram) —
+            // não bloqueiam a resposta, o frontend decide como avisar o usuário.
+            partialErrors: errors.length ? errors : undefined,
+        });
     } catch (error: any) {
         return NextResponse.json(
             { success: false, error: error.message || 'Erro ao buscar contas do Google Ads' },

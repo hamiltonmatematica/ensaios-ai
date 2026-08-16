@@ -188,7 +188,7 @@ export default function MeuGestorDashboard() {
     const getApiHeaders = useCallback(() => {
         const h: Record<string, string> = {};
         if (customMetaToken) h["x-meta-access-token"] = customMetaToken;
-        if (googleAdsConfig.sheetCsvUrl) h["x-google-ads-sheet-url"] = googleAdsConfig.sheetCsvUrl;
+        if (googleAdsConfig.sheetCsvUrls.length) h["x-google-ads-sheet-urls"] = googleAdsConfig.sheetCsvUrls.join(",");
         return h;
     }, [customMetaToken, googleAdsConfig]);
 
@@ -221,7 +221,7 @@ export default function MeuGestorDashboard() {
         setLoading(true); setError(null); setGoogleAdsError(null);
         try {
             const params = buildPeriodParams().toString();
-            const hasGoogleCreds = !!googleAdsConfig.sheetCsvUrl;
+            const hasGoogleCreds = googleAdsConfig.sheetCsvUrls.length > 0;
 
             const metaPromise = fetch(`/api/meugestor/accounts?${params}`, {
                 headers: getApiHeaders(), signal: ctrl.signal,

@@ -13,7 +13,7 @@
 
 var SHEET_URL = 'COLE_AQUI_A_URL_DA_SUA_GOOGLE_SHEETS';
 var SHEET_NAME = 'dados';
-var DAYS_BACK = 90;
+var DAYS_BACK = 395; // ~13 meses — cobre comparativos de mês/semana anterior e também ano-a-ano
 
 function main() {
     var accountSelector = AdsManagerApp.accounts().withLimit(50);
@@ -22,10 +22,20 @@ function main() {
 
 function processClientAccount() {
     var account = AdsApp.currentAccount();
+    var tz = account.getTimeZone();
+    var today = new Date();
+    var startDate = new Date();
+    startDate.setDate(today.getDate() - DAYS_BACK);
+    // Data explícita (BETWEEN) em vez de um atalho tipo LAST_N_DAYS — o Google
+    // Ads só aceita um conjunto fixo de atalhos pré-definidos, então um DAYS_BACK
+    // arbitrário (ex: 395) quebraria a query se usássemos LAST_395_DAYS.
+    var sinceStr = Utilities.formatDate(startDate, tz, 'yyyy-MM-dd');
+    var untilStr = Utilities.formatDate(today, tz, 'yyyy-MM-dd');
+
     var query =
-        'SELECT segments.date, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions ' +
+        'SELECT segments.date, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value ' +
         'FROM customer ' +
-        'WHERE segments.date DURING LAST_' + DAYS_BACK + '_DAYS';
+        "WHERE segments.date BETWEEN '" + sinceStr + "' AND '" + untilStr + "'";
 
     var rows = AdsApp.search(query);
     var days = [];
@@ -37,6 +47,7 @@ function processClientAccount() {
             impressions: Number(row.metrics.impressions || 0),
             clicks: Number(row.metrics.clicks || 0),
             conversions: Number(row.metrics.conversions || 0),
+            conversionsValue: Number(row.metrics.conversionsValue || 0),
         });
     }
 
@@ -51,7 +62,7 @@ function aggregateResults(results) {
     var ss = SpreadsheetApp.openByUrl(SHEET_URL);
     var sheet = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
     sheet.clearContents();
-    sheet.appendRow(['date', 'account_id', 'account_name', 'cost', 'impressions', 'clicks', 'conversions']);
+    sheet.appendRow(['date', 'account_id', 'account_name', 'cost', 'impressions', 'clicks', 'conversions', 'conversions_value']);
 
     var rowsToWrite = [];
     var errors = [];
@@ -64,12 +75,12 @@ function aggregateResults(results) {
         var data = JSON.parse(result.getReturnValue());
         for (var j = 0; j < data.days.length; j++) {
             var d = data.days[j];
-            rowsToWrite.push([d.date, data.accountId, data.accountName, d.cost, d.impressions, d.clicks, d.conversions]);
+            rowsToWrite.push([d.date, data.accountId, data.accountName, d.cost, d.impressions, d.clicks, d.conversions, d.conversionsValue]);
         }
     }
 
     if (rowsToWrite.length > 0) {
-        sheet.getRange(2, 1, rowsToWrite.length, 7).setValues(rowsToWrite);
+        sheet.getRange(2, 1, rowsToWrite.length, 8).setValues(rowsToWrite);
     }
 
     if (errors.length > 0) {

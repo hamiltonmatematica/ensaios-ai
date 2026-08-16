@@ -13,14 +13,19 @@
 import { NextRequest } from 'next/server';
 
 export interface GoogleAdsCreds {
-    sheetCsvUrl: string;
+    sheetCsvUrls: string[];
 }
 
-/** Lê a URL do CSV publicado do header x-google-ads-sheet-url enviado pelo cliente. */
+/**
+ * Lê as URLs dos CSVs publicados do header x-google-ads-sheet-urls (separadas
+ * por vírgula) enviado pelo cliente — uma por MCC, já que cada Google Ads
+ * Script só enxerga as contas da MCC onde ele foi colado.
+ */
 export function getGoogleAdsCreds(request: NextRequest): GoogleAdsCreds | null {
-    const sheetCsvUrl = (request.headers.get('x-google-ads-sheet-url') || '').trim();
-    if (!sheetCsvUrl) return null;
-    return { sheetCsvUrl };
+    const raw = request.headers.get('x-google-ads-sheet-urls') || '';
+    const sheetCsvUrls = raw.split(',').map(u => u.trim()).filter(Boolean);
+    if (sheetCsvUrls.length === 0) return null;
+    return { sheetCsvUrls };
 }
 
 export interface DailyRow {
@@ -31,6 +36,7 @@ export interface DailyRow {
     impressions: number;
     clicks: number;
     conversions: number;
+    conversionsValue: number;
 }
 
 /** Parser CSV simples (com suporte a aspas) — suficiente para o export do Google Sheets. */
@@ -55,13 +61,13 @@ function parseCsvLine(line: string): string[] {
     return cells;
 }
 
-/** Baixa e faz o parse do CSV publicado — lança erro claro se a URL/formato estiver errado. */
-export async function fetchGoogleAdsSheet(creds: GoogleAdsCreds): Promise<DailyRow[]> {
+/** Baixa e faz o parse de UM CSV publicado — lança erro claro se a URL/formato estiver errado. */
+async function fetchOneSheet(url: string): Promise<DailyRow[]> {
     let res: Response;
     try {
-        res = await fetch(creds.sheetCsvUrl);
+        res = await fetch(url);
     } catch (e: any) {
-        throw new Error(`Não consegui acessar a URL da planilha: ${e.message}`);
+        throw new Error(`Não consegui acessar a URL: ${e.message}`);
     }
     if (!res.ok) {
         throw new Error(`Falha ao baixar a planilha (HTTP ${res.status}). Confira se ela está publicada na web como CSV (Arquivo → Compartilhar → Publicar na Web).`);
@@ -79,6 +85,9 @@ export async function fetchGoogleAdsSheet(creds: GoogleAdsCreds): Promise<DailyR
         impressions: header.indexOf('impressions'),
         clicks: header.indexOf('clicks'),
         conversions: header.indexOf('conversions'),
+        // Coluna nova — opcional, planilhas geradas por uma versão anterior do
+        // script ainda não têm ela; cai pra 0 nesse caso (ver abaixo).
+        conversionsValue: header.indexOf('conversions_value'),
     };
     if (idx.date < 0 || idx.accountId < 0 || idx.cost < 0) {
         throw new Error('A planilha não tem as colunas esperadas (date, account_id, account_name, cost, impressions, clicks, conversions). Confira se o Google Ads Script rodou e exportou certo.');
@@ -99,9 +108,32 @@ export async function fetchGoogleAdsSheet(creds: GoogleAdsCreds): Promise<DailyR
             impressions: Number(cells[idx.impressions]) || 0,
             clicks: Number(cells[idx.clicks]) || 0,
             conversions: Number(cells[idx.conversions]) || 0,
+            conversionsValue: idx.conversionsValue >= 0 ? (Number(cells[idx.conversionsValue]) || 0) : 0,
         });
     }
     return rows;
+}
+
+export interface SheetFetchResult {
+    url: string;
+    rows: DailyRow[];
+    error: string | null;
+}
+
+/**
+ * Baixa todas as planilhas configuradas (uma por MCC) em paralelo. Cada uma
+ * é independente — se uma falhar (URL errada, script não rodou etc.), as
+ * outras continuam normalmente; o chamador decide o que fazer com os erros.
+ */
+export async function fetchAllSheets(creds: GoogleAdsCreds): Promise<SheetFetchResult[]> {
+    return Promise.all(creds.sheetCsvUrls.map(async (url) => {
+        try {
+            const rows = await fetchOneSheet(url);
+            return { url, rows, error: null };
+        } catch (e: any) {
+            return { url, rows: [], error: e.message || String(e) };
+        }
+    }));
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -110,7 +142,7 @@ export async function fetchGoogleAdsSheet(creds: GoogleAdsCreds): Promise<DailyR
 
 export interface DateRange { since: string; until: string; }
 
-interface RawTotals { cost: number; impressions: number; clicks: number; conversions: number; }
+interface RawTotals { cost: number; impressions: number; clicks: number; conversions: number; conversionsValue: number; }
 
 function sumInRange(rows: DailyRow[], accountId: string, range: DateRange): RawTotals {
     const filtered = rows.filter(r => r.accountId === accountId && r.date >= range.since && r.date <= range.until);
@@ -119,42 +151,58 @@ function sumInRange(rows: DailyRow[], accountId: string, range: DateRange): RawT
         impressions: filtered.reduce((s, r) => s + r.impressions, 0),
         clicks: filtered.reduce((s, r) => s + r.clicks, 0),
         conversions: filtered.reduce((s, r) => s + r.conversions, 0),
+        conversionsValue: filtered.reduce((s, r) => s + r.conversionsValue, 0),
     };
 }
 
 function deriveMetrics(m: RawTotals) {
     const spend = m.cost;
-    const { impressions, clicks, conversions } = m;
+    const { impressions, clicks, conversions, conversionsValue } = m;
     const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
     const cpc = clicks > 0 ? spend / clicks : 0;
     const cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
     const leads = conversions;
     const cpl = leads > 0 ? spend / leads : 0;
-    return { spend, impressions, clicks, ctr, cpc, cpm, leads, cpl };
+    const purchase_value = conversionsValue;
+    const roas = spend > 0 ? purchase_value / spend : 0;
+    return { spend, impressions, clicks, ctr, cpc, cpm, leads, cpl, purchase_value, roas };
 }
 
 function pctDelta(curr: number, prev: number): number | null {
     return prev > 0 ? ((curr - prev) / prev) * 100 : null;
 }
 
+export interface GoogleAdsAccountsResult {
+    rows: any[];
+    /** Erros por planilha (uma URL pode ter falhado sem derrubar as outras). */
+    errors: { url: string; error: string }[];
+}
+
 /**
  * Monta as linhas de conta do Google Ads no mesmo formato usado pelas linhas
  * do Meta (spend/impressions/clicks/ctr/cpc/cpm/leads/cpl/previous/deltas),
  * pra poderem ser exibidas juntas na mesma InsightsTable do dashboard.
+ * Junta os dados de todas as planilhas configuradas (uma por MCC).
  */
 export async function listGoogleAdsAccountRows(
     creds: GoogleAdsCreds,
     range: DateRange,
     prevRange: DateRange | null,
-): Promise<any[]> {
-    const rows = await fetchGoogleAdsSheet(creds);
+): Promise<GoogleAdsAccountsResult> {
+    const results = await fetchAllSheets(creds);
+    const errors = results.filter(r => r.error).map(r => ({ url: r.url, error: r.error as string }));
+    const rows = results.flatMap(r => r.rows);
+
     if (rows.length === 0) {
-        throw new Error('A planilha está vazia ou ainda não rodou o Google Ads Script. Rode o script manualmente uma vez e confira a aba "dados".');
+        if (errors.length > 0) {
+            throw new Error(errors.map(e => e.error).join(' | '));
+        }
+        throw new Error('As planilhas estão vazias ou o Google Ads Script ainda não rodou. Rode o script manualmente uma vez e confira a aba "dados".');
     }
 
     const accountIds = Array.from(new Set(rows.map(r => r.accountId)));
 
-    return accountIds.map(accountId => {
+    const accountRows = accountIds.map(accountId => {
         const nameRow = rows.find(r => r.accountId === accountId);
         const currRaw = sumInRange(rows, accountId, range);
         const prevRaw = prevRange ? sumInRange(rows, accountId, prevRange) : null;
@@ -170,6 +218,8 @@ export async function listGoogleAdsAccountRows(
             cpm: pctDelta(curr.cpm, prev.cpm),
             leads: pctDelta(curr.leads, prev.leads),
             cpl: pctDelta(curr.cpl, prev.cpl),
+            purchase_value: pctDelta(curr.purchase_value, prev.purchase_value),
+            roas: pctDelta(curr.roas, prev.roas),
         } : null;
 
         return {
@@ -179,7 +229,7 @@ export async function listGoogleAdsAccountRows(
             account_id: accountId,
             currency: 'BRL',
             ...curr,
-            purchases: 0, purchase_value: 0, roas: 0, messaging_started: 0, reach: 0, frequency: 0,
+            purchases: 0, messaging_started: 0, reach: 0, frequency: 0,
             has_any_ads: curr.spend > 0 || curr.impressions > 0,
             has_ads_in_period: curr.spend > 0,
             issues: [] as string[],
@@ -189,4 +239,6 @@ export async function listGoogleAdsAccountRows(
             health: undefined,
         };
     }).sort((a, b) => b.spend - a.spend);
+
+    return { rows: accountRows, errors };
 }
