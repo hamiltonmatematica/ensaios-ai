@@ -32,7 +32,7 @@ import CmdK, { CmdItem } from "./components/CmdK";
 import InsightsTable from "./components/InsightsTable";
 import SmartInsights from "./components/SmartInsights";
 import TokenModal from "./components/TokenModal";
-import GoogleAdsTokenModal, { GoogleAdsConfig, EMPTY_GOOGLE_ADS_CONFIG } from "./components/GoogleAdsTokenModal";
+import GoogleAdsTokenModal, { GoogleAdsConfig, EMPTY_GOOGLE_ADS_CONFIG, normalizeGoogleAdsConfig } from "./components/GoogleAdsTokenModal";
 import CreateCampaignWizard from "./components/CreateCampaignWizard";
 import AudienceManager from "./components/AudienceManager";
 import BudgetEditModal from "./components/BudgetEditModal";
@@ -151,7 +151,7 @@ export default function MeuGestorDashboard() {
         const savedToken = load<string>("custom_meta_token", "");
         setCustomMetaToken(savedToken);
         setInlineTokenInput(savedToken);
-        setGoogleAdsConfig(load<GoogleAdsConfig>("google_ads_config", EMPTY_GOOGLE_ADS_CONFIG));
+        setGoogleAdsConfig(normalizeGoogleAdsConfig(load<any>("google_ads_config", null)));
         setFavorites(new Set(load<string[]>(KEYS.favorites, [])));
         setAccountMetrics(load(KEYS.metricsByLevel + ":account", DEFAULT_ACCOUNT_METRICS));
         setCampaignMetrics(load(KEYS.metricsByLevel + ":campaign", DEFAULT_CAMPAIGN_METRICS));

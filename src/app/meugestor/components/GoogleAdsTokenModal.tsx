@@ -8,6 +8,22 @@ export interface GoogleAdsConfig {
 
 export const EMPTY_GOOGLE_ADS_CONFIG: GoogleAdsConfig = { sheetCsvUrls: [] };
 
+/**
+ * Normaliza o que veio do localStorage pro formato atual — inclui migrar o
+ * formato antigo de campo único (sheetCsvUrl: string, versões anteriores a
+ * multi-MCC) e blindar contra qualquer shape inesperado/corrompido, pra
+ * nunca deixar sheetCsvUrls undefined estourar em .length/.join/.map.
+ */
+export function normalizeGoogleAdsConfig(raw: any): GoogleAdsConfig {
+    if (raw && Array.isArray(raw.sheetCsvUrls)) {
+        return { sheetCsvUrls: raw.sheetCsvUrls.filter((u: any) => typeof u === "string" && u.trim()) };
+    }
+    if (raw && typeof raw.sheetCsvUrl === "string" && raw.sheetCsvUrl.trim()) {
+        return { sheetCsvUrls: [raw.sheetCsvUrl.trim()] };
+    }
+    return EMPTY_GOOGLE_ADS_CONFIG;
+}
+
 interface Props {
     open: boolean;
     onClose: () => void;
