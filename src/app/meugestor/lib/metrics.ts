@@ -42,6 +42,7 @@ export const METRIC_CATALOG: MetricDef[] = [
     { key: 'page_engagement', label: 'Engaj. Página', category: 'engajamento', format: 'number', tooltip: 'Engajamento total na página', higherIsBetter: true },
     { key: 'post_reaction', label: 'Reações', category: 'engajamento', format: 'number', tooltip: 'Curtidas, amor, etc.', higherIsBetter: true },
     { key: 'post_save', label: 'Salvamentos', category: 'engajamento', format: 'number', tooltip: 'Sinal forte de criativo de qualidade', higherIsBetter: true },
+    { key: 'interactions', label: 'Interações', category: 'engajamento', format: 'number', tooltip: 'Google Ads: principal ação de engajamento do anúncio (cliques em Search/Shopping, views em Video)', higherIsBetter: true },
 
     // CUSTO
     { key: 'cpc', label: 'CPC', category: 'custo', format: 'currency', tooltip: 'Custo por clique', higherIsBetter: false },
@@ -72,6 +73,10 @@ export const METRIC_CATALOG: MetricDef[] = [
     { key: 'landing_page_views', label: 'Landing Page Views', category: 'conversao', format: 'number', tooltip: 'Carregamentos completos da página de destino — diferente de cliques!', higherIsBetter: true },
     { key: 'cpa_landing', label: 'Custo / LPV', category: 'conversao', format: 'currency', tooltip: 'Custo por landing page view', higherIsBetter: false },
     { key: 'search', label: 'Buscas', category: 'conversao', format: 'number', tooltip: 'Eventos search', higherIsBetter: true },
+    { key: 'all_conversions', label: 'Todas Conversões', short: 'All Conv.', category: 'conversao', format: 'number', tooltip: 'Google Ads: conversões de todos os tipos, incluindo cross-device e assistidas (mais amplo que "Conversões")', higherIsBetter: true },
+    { key: 'all_conversions_value', label: 'Valor (Todas Conv.)', category: 'conversao', format: 'currency', tooltip: 'Google Ads: valor monetário de todas as conversões', higherIsBetter: true },
+    { key: 'cpa_all_conversions', label: 'CPA (Todas Conv.)', category: 'conversao', format: 'currency', tooltip: 'Google Ads: custo por conversão, considerando todas as conversões', higherIsBetter: false },
+    { key: 'view_through_conversions', label: 'Conv. por Visualização', short: 'View-through', category: 'conversao', format: 'number', tooltip: 'Google Ads: conversões atribuídas a quem viu (não clicou) o anúncio — comum em Display/Video', higherIsBetter: true },
 
     // VÍDEO
     { key: 'video_3s', label: 'Views 3s', category: 'video', format: 'number', tooltip: 'Visualizações de pelo menos 3 segundos (hook)', higherIsBetter: true },
@@ -111,6 +116,7 @@ export const PRESETS: Record<string, string[]> = {
     'Engajamento': ['spend', 'reach', 'frequency', 'post_engagement', 'post_reaction', 'post_save', 'ctr'],
     'E-commerce': ['spend', 'view_content', 'add_to_cart', 'initiate_checkout', 'purchases', 'purchase_value', 'roas', 'cpa_purchase'],
     'Diagnóstico': ['spend', 'ctr', 'cpc', 'cpm', 'frequency', 'quality_ranking', 'engagement_rate_ranking', 'conversion_rate_ranking', 'health'],
+    'Google Ads': ['spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm', 'leads', 'cpl', 'roas', 'all_conversions', 'view_through_conversions', 'interactions'],
 };
 
 // ─────────────────────────────────────────────────────────────

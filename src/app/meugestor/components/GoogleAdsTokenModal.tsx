@@ -4,24 +4,29 @@ import { Globe, Check, X, Trash2, PlugZap, Loader2, CircleCheck, CircleAlert, Pl
 
 export interface GoogleAdsConfig {
     sheetCsvUrls: string[];
+    campaignSheetCsvUrls: string[];
 }
 
-export const EMPTY_GOOGLE_ADS_CONFIG: GoogleAdsConfig = { sheetCsvUrls: [] };
+export const EMPTY_GOOGLE_ADS_CONFIG: GoogleAdsConfig = { sheetCsvUrls: [], campaignSheetCsvUrls: [] };
+
+function cleanUrlArray(raw: any): string[] {
+    return Array.isArray(raw) ? raw.filter((u: any) => typeof u === "string" && u.trim()).map((u: string) => u.trim()) : [];
+}
 
 /**
- * Normaliza o que veio do localStorage pro formato atual — inclui migrar o
- * formato antigo de campo único (sheetCsvUrl: string, versões anteriores a
- * multi-MCC) e blindar contra qualquer shape inesperado/corrompido, pra
- * nunca deixar sheetCsvUrls undefined estourar em .length/.join/.map.
+ * Normaliza o que veio do localStorage pro formato atual — inclui migrar
+ * formatos antigos (sheetCsvUrl: string, de antes do multi-MCC; sheetCsvUrls
+ * sem campaignSheetCsvUrls, de antes do drill-down) e blindar contra
+ * qualquer shape inesperado/corrompido, pra nunca deixar um desses arrays
+ * undefined estourar em .length/.join/.map.
  */
 export function normalizeGoogleAdsConfig(raw: any): GoogleAdsConfig {
-    if (raw && Array.isArray(raw.sheetCsvUrls)) {
-        return { sheetCsvUrls: raw.sheetCsvUrls.filter((u: any) => typeof u === "string" && u.trim()) };
-    }
-    if (raw && typeof raw.sheetCsvUrl === "string" && raw.sheetCsvUrl.trim()) {
-        return { sheetCsvUrls: [raw.sheetCsvUrl.trim()] };
-    }
-    return EMPTY_GOOGLE_ADS_CONFIG;
+    if (!raw || typeof raw !== "object") return EMPTY_GOOGLE_ADS_CONFIG;
+    const sheetCsvUrls = Array.isArray(raw.sheetCsvUrls)
+        ? cleanUrlArray(raw.sheetCsvUrls)
+        : (typeof raw.sheetCsvUrl === "string" && raw.sheetCsvUrl.trim() ? [raw.sheetCsvUrl.trim()] : []);
+    const campaignSheetCsvUrls = cleanUrlArray(raw.campaignSheetCsvUrls);
+    return { sheetCsvUrls, campaignSheetCsvUrls };
 }
 
 interface Props {
@@ -32,36 +37,79 @@ interface Props {
     onClear: () => void;
 }
 
-interface PerSheetResult { url: string; rowCount: number; accountCount: number; error: string | null; }
+interface SheetSummary { rowCount: number; accountCount: number; dateFrom: string | null; dateTo: string | null; }
+interface PerSheetResult extends SheetSummary { url: string; error: string | null; }
 
 type TestResult =
-    | { ok: true; rowCount: number; accountCount: number; accountNames: string[]; dateFrom: string; dateTo: string; perSheet: PerSheetResult[] }
+    | { ok: true; accounts: SheetSummary & { accountNames: string[]; perSheet: PerSheetResult[] }; campaigns: SheetSummary & { perSheet: PerSheetResult[] } }
     | { ok: false; error: string };
+
+function UrlListEditor({ label, hint, urls, setUrls }: { label: string; hint: string; urls: string[]; setUrls: (u: string[]) => void }) {
+    return (
+        <div style={{ marginBottom: "1.25rem" }}>
+            <label style={{ display: "block", fontSize: "0.75rem", color: "rgba(255,255,255,0.7)", marginBottom: "0.35rem", fontWeight: 600 }}>
+                {label}
+            </label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {urls.map((url, i) => (
+                    <div key={i} style={{ display: "flex", gap: "0.4rem" }}>
+                        <input
+                            type="text"
+                            value={url}
+                            onChange={e => setUrls(urls.map((u, j) => j === i ? e.target.value : u))}
+                            placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"
+                            style={{
+                                flex: 1, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.15)",
+                                borderRadius: "0.5rem", padding: "0.6rem 0.75rem", color: "white", fontSize: "0.8rem",
+                                fontFamily: "monospace", outline: "none", boxSizing: "border-box",
+                            }}
+                        />
+                        {urls.length > 1 && (
+                            <button onClick={() => setUrls(urls.filter((_, j) => j !== i))}
+                                title="Remover" className="g-btn-secondary" style={{ padding: "0.5rem", display: "inline-flex" }}>
+                                <X style={{ width: 14, height: 14 }} />
+                            </button>
+                        )}
+                    </div>
+                ))}
+            </div>
+            <button onClick={() => setUrls([...urls, ""])} className="g-btn-secondary"
+                style={{ marginTop: "0.5rem", padding: "0.4rem 0.7rem", fontSize: "0.72rem", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                <Plus style={{ width: 12, height: 12 }} /> Adicionar outra planilha
+            </button>
+            <p style={{ fontSize: "0.68rem", color: "rgba(255,255,255,0.4)", marginTop: "0.5rem" }}>{hint}</p>
+        </div>
+    );
+}
 
 export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSave, onClear }: Props) {
     const [urls, setUrls] = useState<string[]>(currentConfig.sheetCsvUrls.length ? currentConfig.sheetCsvUrls : [""]);
+    const [campaignUrls, setCampaignUrls] = useState<string[]>(currentConfig.campaignSheetCsvUrls.length ? currentConfig.campaignSheetCsvUrls : [""]);
     const [saved, setSaved] = useState(false);
     const [testing, setTesting] = useState(false);
     const [testResult, setTestResult] = useState<TestResult | null>(null);
 
     useEffect(() => {
         setUrls(currentConfig.sheetCsvUrls.length ? currentConfig.sheetCsvUrls : [""]);
+        setCampaignUrls(currentConfig.campaignSheetCsvUrls.length ? currentConfig.campaignSheetCsvUrls : [""]);
         setTestResult(null);
     }, [currentConfig, open]);
 
     if (!open) return null;
 
-    const isConfigured = currentConfig.sheetCsvUrls.length > 0;
+    const isConfigured = currentConfig.sheetCsvUrls.length > 0 || currentConfig.campaignSheetCsvUrls.length > 0;
     const cleanUrls = urls.map(u => u.trim()).filter(Boolean);
+    const cleanCampaignUrls = campaignUrls.map(u => u.trim()).filter(Boolean);
 
     const handleSave = () => {
-        onSave({ sheetCsvUrls: cleanUrls });
+        onSave({ sheetCsvUrls: cleanUrls, campaignSheetCsvUrls: cleanCampaignUrls });
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
     };
 
     const handleClear = () => {
         setUrls([""]);
+        setCampaignUrls([""]);
         setTestResult(null);
         onClear();
     };
@@ -72,6 +120,7 @@ export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSa
         try {
             const headers: Record<string, string> = {};
             if (cleanUrls.length) headers["x-google-ads-sheet-urls"] = cleanUrls.join(",");
+            if (cleanCampaignUrls.length) headers["x-google-ads-campaign-sheet-urls"] = cleanCampaignUrls.join(",");
 
             const res = await fetch("/api/meugestor/gads/test", { headers });
             const json = await res.json();
@@ -111,56 +160,34 @@ export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSa
                     </button>
                 </div>
 
-                <div style={{ marginBottom: "1.25rem" }}>
-                    <label style={{ display: "block", fontSize: "0.75rem", color: "rgba(255,255,255,0.7)", marginBottom: "0.35rem", fontWeight: 600 }}>
-                        URLs dos CSVs publicados (uma por MCC)
-                    </label>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                        {urls.map((url, i) => (
-                            <div key={i} style={{ display: "flex", gap: "0.4rem" }}>
-                                <input
-                                    type="text"
-                                    value={url}
-                                    onChange={e => setUrls(urls.map((u, j) => j === i ? e.target.value : u))}
-                                    placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"
-                                    style={{
-                                        flex: 1, background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.15)",
-                                        borderRadius: "0.5rem", padding: "0.6rem 0.75rem", color: "white", fontSize: "0.8rem",
-                                        fontFamily: "monospace", outline: "none", boxSizing: "border-box",
-                                    }}
-                                />
-                                {urls.length > 1 && (
-                                    <button onClick={() => setUrls(urls.filter((_, j) => j !== i))}
-                                        title="Remover" className="g-btn-secondary" style={{ padding: "0.5rem", display: "inline-flex" }}>
-                                        <X style={{ width: 14, height: 14 }} />
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                    <button onClick={() => setUrls([...urls, ""])} className="g-btn-secondary"
-                        style={{ marginTop: "0.5rem", padding: "0.4rem 0.7rem", fontSize: "0.72rem", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
-                        <Plus style={{ width: 12, height: 12 }} /> Adicionar outra planilha (outro MCC)
-                    </button>
-                    <p style={{ fontSize: "0.68rem", color: "rgba(255,255,255,0.4)", marginTop: "0.5rem" }}>
-                        Essas URLs ficam salvas no localStorage do seu navegador. Se você participa de mais de um MCC, cada um precisa do seu próprio script + planilha (o script só enxerga contas do MCC onde foi colado) — adicione uma linha aqui por MCC.
-                    </p>
-                </div>
+                <UrlListEditor
+                    label="Planilhas de CONTAS — aba &quot;dados&quot; (uma por MCC)"
+                    hint="Totais diários por conta, histórico longo (~13 meses) — alimenta a lista principal de contas e os comparativos de período."
+                    urls={urls}
+                    setUrls={setUrls}
+                />
+
+                <UrlListEditor
+                    label="Planilhas de CAMPANHAS — aba &quot;campanhas&quot; (opcional, uma por MCC)"
+                    hint="Detalhe por campanha/grupo de anúncios, histórico mais curto (~3 meses) — alimenta o drill-down ao clicar numa conta Google. Pode deixar em branco se só quiser o total da conta."
+                    urls={campaignUrls}
+                    setUrls={setCampaignUrls}
+                />
 
                 <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "0.5rem", padding: "0.75rem", marginBottom: "1.25rem", fontSize: "0.75rem", color: "rgba(255,255,255,0.7)" }}>
                     <p style={{ margin: 0, fontWeight: 600, color: "white" }}>Como conseguir essas URLs?</p>
-                    <p style={{ margin: "0.3rem 0 0" }}>Passo a passo completo em GOOGLE_ADS_SETUP.md — um Google Ads Script (scripts/google-ads-export.gs) exporta os dados de cada MCC pra uma Google Sheets, que você publica na web como CSV.</p>
+                    <p style={{ margin: "0.3rem 0 0" }}>Passo a passo completo em GOOGLE_ADS_SETUP.md — um Google Ads Script (scripts/google-ads-export.gs) exporta os dados de cada MCC pra uma Google Sheets (abas "dados" e "campanhas"), que você publica na web como CSV.</p>
                 </div>
 
                 <div style={{ marginBottom: "1.25rem" }}>
                     <button
                         onClick={handleTest}
-                        disabled={testing || cleanUrls.length === 0}
+                        disabled={testing || (cleanUrls.length === 0 && cleanCampaignUrls.length === 0)}
                         className="g-btn-secondary"
-                        style={{ width: "100%", justifyContent: "center", padding: "0.6rem", fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: "0.4rem", opacity: (testing || cleanUrls.length === 0) ? 0.5 : 1 }}
+                        style={{ width: "100%", justifyContent: "center", padding: "0.6rem", fontSize: "0.78rem", display: "inline-flex", alignItems: "center", gap: "0.4rem", opacity: (testing || (cleanUrls.length === 0 && cleanCampaignUrls.length === 0)) ? 0.5 : 1 }}
                     >
                         {testing ? <Loader2 className="g-pulse" style={{ width: 14, height: 14 }} /> : <PlugZap style={{ width: 14, height: 14 }} />}
-                        {testing ? "Testando..." : `Testar ${cleanUrls.length > 1 ? `${cleanUrls.length} planilhas` : "planilha"}`}
+                        {testing ? "Testando..." : "Testar planilhas"}
                     </button>
 
                     {testResult && (
@@ -171,21 +198,33 @@ export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSa
                             color: testResult.ok ? "#34d399" : "#f87171",
                         }}>
                             {testResult.ok ? (
-                                <div>
-                                    <div style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start" }}>
-                                        <CircleCheck style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1 }} />
-                                        <span>
-                                            {testResult.rowCount} linhas · {testResult.accountCount} contas ({testResult.accountNames.join(", ")}) · {testResult.dateFrom} a {testResult.dateTo}
-                                        </span>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                                    <div>
+                                        <p style={{ margin: "0 0 0.2rem", fontWeight: 700 }}>Contas</p>
+                                        <div style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start" }}>
+                                            <CircleCheck style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1 }} />
+                                            <span>
+                                                {testResult.accounts.rowCount} linhas · {testResult.accounts.accountCount} contas ({testResult.accounts.accountNames.join(", ") || "nenhuma"}) · {testResult.accounts.dateFrom || "—"} a {testResult.accounts.dateTo || "—"}
+                                            </span>
+                                        </div>
                                     </div>
-                                    {testResult.perSheet.length > 1 && (
-                                        <div style={{ marginTop: "0.5rem", paddingTop: "0.5rem", borderTop: "1px solid rgba(255,255,255,0.1)", display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-                                            {testResult.perSheet.map((s, i) => (
-                                                <div key={i} style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start", color: s.error ? "#f87171" : "#34d399" }}>
-                                                    {s.error ? <CircleAlert style={{ width: 12, height: 12, flexShrink: 0, marginTop: 1 }} /> : <CircleCheck style={{ width: 12, height: 12, flexShrink: 0, marginTop: 1 }} />}
-                                                    <span style={{ wordBreak: "break-all" }}>
-                                                        {s.url.slice(0, 60)}... {s.error ? `— ${s.error}` : `— ${s.rowCount} linhas, ${s.accountCount} contas`}
-                                                    </span>
+                                    <div>
+                                        <p style={{ margin: "0 0 0.2rem", fontWeight: 700 }}>Campanhas</p>
+                                        <div style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start" }}>
+                                            {testResult.campaigns.rowCount > 0 ? <CircleCheck style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1 }} /> : <CircleAlert style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1, color: "#fbbf24" }} />}
+                                            <span>
+                                                {testResult.campaigns.rowCount > 0
+                                                    ? `${testResult.campaigns.rowCount} linhas · ${testResult.campaigns.accountCount} contas · ${testResult.campaigns.dateFrom} a ${testResult.campaigns.dateTo}`
+                                                    : "Sem dados (drill-down não vai funcionar até configurar a planilha de campanhas)"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {[...testResult.accounts.perSheet, ...testResult.campaigns.perSheet].some(s => s.error) && (
+                                        <div style={{ paddingTop: "0.4rem", borderTop: "1px solid rgba(255,255,255,0.1)", display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                                            {[...testResult.accounts.perSheet, ...testResult.campaigns.perSheet].filter(s => s.error).map((s, i) => (
+                                                <div key={i} style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start", color: "#f87171" }}>
+                                                    <CircleAlert style={{ width: 12, height: 12, flexShrink: 0, marginTop: 1 }} />
+                                                    <span style={{ wordBreak: "break-all" }}>{s.url.slice(0, 60)}... — {s.error}</span>
                                                 </div>
                                             ))}
                                         </div>

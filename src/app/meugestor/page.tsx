@@ -55,6 +55,7 @@ const DEFAULT_ACCOUNT_METRICS = PRESETS["Diagnóstico"];
 const DEFAULT_CAMPAIGN_METRICS = ["spend", "impressions", "ctr", "inline_link_clicks", "cpc", "cpm", "leads", "cpl", "messaging_started", "frequency"];
 const DEFAULT_ADSET_METRICS = ["spend", "impressions", "ctr", "inline_link_clicks", "cpc", "cpm", "leads", "cpl", "messaging_started", "frequency"];
 const DEFAULT_AD_METRICS = ["spend", "impressions", "ctr", "cpc", "leads", "cpl", "messaging_started", "hook_rate", "hold_rate", "frequency"];
+const GOOGLE_KPI_SET = ["spend", "impressions", "clicks", "ctr", "cpc", "cpm", "leads", "cpl", "roas", "all_conversions", "view_through_conversions", "interactions"];
 
 interface PeriodMeta { preset?: string; range?: { since: string; until: string }; previous?: { since: string; until: string } | null; }
 
@@ -110,6 +111,12 @@ export default function MeuGestorDashboard() {
 
     const [campaignDetail, setCampaignDetail] = useState<{ ads: any[]; daily: any[] } | null>(null);
     const [loadingCampaign, setLoadingCampaign] = useState(false);
+
+    // Drill-down Google Ads (conta > campanha > grupo de anúncios)
+    const [googleCampaignRows, setGoogleCampaignRows] = useState<any[]>([]);
+    const [loadingGoogleCampaigns, setLoadingGoogleCampaigns] = useState(false);
+    const [googleAdGroupRows, setGoogleAdGroupRows] = useState<any[]>([]);
+    const [loadingGoogleAdGroups, setLoadingGoogleAdGroups] = useState(false);
 
     // Persistência
     const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -189,6 +196,7 @@ export default function MeuGestorDashboard() {
         const h: Record<string, string> = {};
         if (customMetaToken) h["x-meta-access-token"] = customMetaToken;
         if (googleAdsConfig.sheetCsvUrls.length) h["x-google-ads-sheet-urls"] = googleAdsConfig.sheetCsvUrls.join(",");
+        if (googleAdsConfig.campaignSheetCsvUrls.length) h["x-google-ads-campaign-sheet-urls"] = googleAdsConfig.campaignSheetCsvUrls.join(",");
         return h;
     }, [customMetaToken, googleAdsConfig]);
 
@@ -308,13 +316,55 @@ export default function MeuGestorDashboard() {
         }
     }, [buildPeriodParams, getApiHeaders]);
 
-    // re-busca detalhes ao mudar período (contas Google ainda não têm detalhamento por campanha)
+    const googleCampaignsAbortRef = useRef<AbortController | null>(null);
+    const fetchGoogleCampaigns = useCallback(async (accountId: string) => {
+        googleCampaignsAbortRef.current?.abort();
+        const ctrl = new AbortController();
+        googleCampaignsAbortRef.current = ctrl;
+        setLoadingGoogleCampaigns(true);
+        try {
+            const res = await fetch(`/api/meugestor/gads/campaigns/${accountId}?${buildPeriodParams().toString()}`, {
+                headers: getApiHeaders(), signal: ctrl.signal,
+            });
+            const json = await res.json();
+            setGoogleCampaignRows(json.success ? json.data : []);
+        } catch (e: any) {
+            if (e.name !== "AbortError") console.error(e);
+        } finally {
+            if (googleCampaignsAbortRef.current === ctrl) setLoadingGoogleCampaigns(false);
+        }
+    }, [buildPeriodParams, getApiHeaders]);
+
+    const googleAdGroupsAbortRef = useRef<AbortController | null>(null);
+    const fetchGoogleAdGroups = useCallback(async (campaignId: string) => {
+        googleAdGroupsAbortRef.current?.abort();
+        const ctrl = new AbortController();
+        googleAdGroupsAbortRef.current = ctrl;
+        setLoadingGoogleAdGroups(true);
+        try {
+            const res = await fetch(`/api/meugestor/gads/adgroups/${campaignId}?${buildPeriodParams().toString()}`, {
+                headers: getApiHeaders(), signal: ctrl.signal,
+            });
+            const json = await res.json();
+            setGoogleAdGroupRows(json.success ? json.data : []);
+        } catch (e: any) {
+            if (e.name !== "AbortError") console.error(e);
+        } finally {
+            if (googleAdGroupsAbortRef.current === ctrl) setLoadingGoogleAdGroups(false);
+        }
+    }, [buildPeriodParams, getApiHeaders]);
+
+    // re-busca detalhes ao mudar período — Google usa rotas/estado próprios (conta > campanha > grupo de anúncios)
     useEffect(() => {
-        if (selectedAccountId && !selectedAccountId.startsWith("google:")) fetchAccountDetail(selectedAccountId);
-    }, [selectedAccountId, fetchAccountDetail]);
+        if (!selectedAccountId) return;
+        if (selectedAccountId.startsWith("google:")) fetchGoogleCampaigns(selectedAccountId.replace(/^google:/, ""));
+        else fetchAccountDetail(selectedAccountId);
+    }, [selectedAccountId, fetchAccountDetail, fetchGoogleCampaigns]);
     useEffect(() => {
-        if (selectedCampaignId) fetchCampaignDetail(selectedCampaignId);
-    }, [selectedCampaignId, fetchCampaignDetail]);
+        if (!selectedCampaignId) return;
+        if (selectedCampaignId.startsWith("google:")) fetchGoogleAdGroups(selectedCampaignId.replace(/^google:/, ""));
+        else fetchCampaignDetail(selectedCampaignId);
+    }, [selectedCampaignId, fetchCampaignDetail, fetchGoogleAdGroups]);
 
     // ── Handlers ──
     const toggleFavorite = (id: string) => {
@@ -860,13 +910,41 @@ export default function MeuGestorDashboard() {
                         </div>
                     )}
 
-                    {/* ========== ACCOUNT DETAIL (GOOGLE — sem campanha ainda) ========== */}
+                    {/* ========== ACCOUNT DETAIL (GOOGLE — mostra campanhas) ========== */}
                     {selectedAccountId && selectedAccount && selectedAccount.source === "google" && !selectedCampaignId && !selectedAdId && (
                         <div className="g-fade-in" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                            <KpiGrid ctx="account" row={selectedAccount} selected={["spend", "impressions", "clicks", "ctr", "cpc", "cpm", "leads", "cpl"]} />
-                            <div className="g-glass" style={{ padding: "1.5rem", borderRadius: "0.75rem", textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: "0.82rem" }}>
-                                <Globe style={{ width: 24, height: 24, margin: "0 auto 0.5rem", color: "#8ab4f8" }} />
-                                Detalhamento por campanha do Google Ads ainda não implementado — por enquanto só o total da conta no período.
+                            <KpiGrid ctx="account" row={selectedAccount} selected={GOOGLE_KPI_SET} />
+                            <div className="g-glass" style={{ overflow: "hidden" }}>
+                                <div style={{ padding: "0.85rem 1rem", borderBottom: "1px solid var(--glass-border)" }}>
+                                    <h4 style={{ fontSize: "0.95rem", fontWeight: 700, color: "white" }}>
+                                        <Layers style={{ width: 14, height: 14, display: "inline", marginRight: 6 }} />
+                                        Campanhas ({googleCampaignRows.length})
+                                    </h4>
+                                </div>
+                                {loadingGoogleCampaigns ? (
+                                    <div style={{ display: "flex", justifyContent: "center", padding: "3rem" }}>
+                                        <Loader2 className="g-pulse" style={{ width: 28, height: 28, color: "rgba(255,255,255,0.3)" }} />
+                                    </div>
+                                ) : (
+                                    <InsightsTable
+                                        rows={googleCampaignRows}
+                                        selectedMetrics={PRESETS['Google Ads']}
+                                        nameKey="name" nameLabel="Campanha" idKey="id"
+                                        onRowClick={r => handleSelectCampaign(r.id)}
+                                        emptyText="Nenhuma campanha com dados no período — confira se a planilha de campanhas foi configurada."
+                                        extraColumnsLeft={[{
+                                            key: "status", label: "Status", render: (r: any) => (
+                                                <span className="g-badge" style={{
+                                                    fontSize: "0.6rem",
+                                                    background: r.status === "ENABLED" ? "rgba(52,211,153,0.18)" : "rgba(255,255,255,0.08)",
+                                                    color: r.status === "ENABLED" ? "#34d399" : "rgba(255,255,255,0.6)",
+                                                }}>
+                                                    {r.status_label || r.status || "—"}
+                                                </span>
+                                            ),
+                                        }]}
+                                    />
+                                )}
                             </div>
                         </div>
                     )}
@@ -988,8 +1066,49 @@ export default function MeuGestorDashboard() {
                         </div>
                     )}
 
-                    {/* ========== CAMPAIGN DETAIL (mostra conjuntos) ========== */}
-                    {selectedAccountId && selectedCampaignId && !selectedAdsetId && !selectedAdId && (
+                    {/* ========== CAMPAIGN DETAIL (GOOGLE — mostra grupos de anúncios) ========== */}
+                    {selectedCampaignId && selectedCampaignId.startsWith("google:") && (
+                        <div className="g-fade-in" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                            {(() => {
+                                const camp = googleCampaignRows.find((c: any) => c.id === selectedCampaignId);
+                                return camp ? <KpiGrid ctx="campaign" row={camp} selected={GOOGLE_KPI_SET} /> : null;
+                            })()}
+                            <div className="g-glass" style={{ overflow: "hidden" }}>
+                                <div style={{ padding: "0.85rem 1rem", borderBottom: "1px solid var(--glass-border)" }}>
+                                    <h4 style={{ fontSize: "0.95rem", fontWeight: 700, color: "white" }}>
+                                        <Hash style={{ width: 14, height: 14, display: "inline", marginRight: 6 }} />
+                                        Grupos de Anúncios ({googleAdGroupRows.length})
+                                    </h4>
+                                </div>
+                                {loadingGoogleAdGroups ? (
+                                    <div style={{ display: "flex", justifyContent: "center", padding: "3rem" }}>
+                                        <Loader2 className="g-pulse" style={{ width: 28, height: 28, color: "rgba(255,255,255,0.3)" }} />
+                                    </div>
+                                ) : (
+                                    <InsightsTable
+                                        rows={googleAdGroupRows}
+                                        selectedMetrics={PRESETS['Google Ads']}
+                                        nameKey="name" nameLabel="Grupo de Anúncios" idKey="id"
+                                        emptyText="Nenhum grupo de anúncios com dados no período."
+                                        extraColumnsLeft={[{
+                                            key: "status", label: "Status", render: (r: any) => (
+                                                <span className="g-badge" style={{
+                                                    fontSize: "0.6rem",
+                                                    background: r.status === "ENABLED" ? "rgba(52,211,153,0.18)" : "rgba(255,255,255,0.08)",
+                                                    color: r.status === "ENABLED" ? "#34d399" : "rgba(255,255,255,0.6)",
+                                                }}>
+                                                    {r.status_label || r.status || "—"}
+                                                </span>
+                                            ),
+                                        }]}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ========== CAMPAIGN DETAIL (META — mostra conjuntos) ========== */}
+                    {selectedAccountId && selectedCampaignId && !selectedCampaignId.startsWith("google:") && !selectedAdsetId && !selectedAdId && (
                         <div className="g-fade-in" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                             {/* KPIs da campanha */}
                             {(() => {
