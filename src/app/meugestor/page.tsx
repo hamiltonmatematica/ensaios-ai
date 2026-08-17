@@ -140,6 +140,7 @@ export default function MeuGestorDashboard() {
     // Credenciais Google Ads
     const [googleAdsConfig, setGoogleAdsConfig] = useState<GoogleAdsConfig>(EMPTY_GOOGLE_ADS_CONFIG);
     const [googleAdsModalOpen, setGoogleAdsModalOpen] = useState(false);
+    const [googleAdsConnectMessage, setGoogleAdsConnectMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
     // Modais
     const [pickerOpen, setPickerOpen] = useState<null | "account" | "campaign" | "adset" | "ad">(null);
@@ -152,6 +153,21 @@ export default function MeuGestorDashboard() {
     const [audiencesOpen, setAudiencesOpen] = useState(false);
     const [rulesOpen, setRulesOpen] = useState(false);
     const [budgetEntity, setBudgetEntity] = useState<{ id: string; name: string; kind: "campaign" | "adset"; currentDailyCents?: number | null } | null>(null);
+
+    // ── Feedback do retorno do OAuth do Google Ads (?google_ads_connect=success|error) ──
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const result = params.get("google_ads_connect");
+        if (!result) return;
+        if (result === "success") {
+            setGoogleAdsConnectMessage({ ok: true, text: "Google Ads conectado com sucesso!" });
+            setGoogleAdsModalOpen(true);
+        } else {
+            setGoogleAdsConnectMessage({ ok: false, text: params.get("msg") || "Falha ao conectar Google Ads." });
+            setGoogleAdsModalOpen(true);
+        }
+        window.history.replaceState({}, "", window.location.pathname);
+    }, []);
 
     // ── Hidrata localStorage ──
     useEffect(() => {
@@ -627,6 +643,22 @@ export default function MeuGestorDashboard() {
     return (
         <div style={{ minHeight: "100vh" }}>
             {anyLoading && <div className="g-loadbar" />}
+            {googleAdsConnectMessage && (
+                <div style={{
+                    position: "fixed", top: "1rem", left: "50%", transform: "translateX(-50%)", zIndex: 300,
+                    display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.65rem 1rem", borderRadius: "0.6rem",
+                    background: googleAdsConnectMessage.ok ? "rgba(52,211,153,0.15)" : "rgba(248,113,113,0.15)",
+                    border: `1px solid ${googleAdsConnectMessage.ok ? "rgba(52,211,153,0.4)" : "rgba(248,113,113,0.4)"}`,
+                    color: googleAdsConnectMessage.ok ? "#34d399" : "#f87171", fontSize: "0.8rem", backdropFilter: "blur(12px)",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+                }}>
+                    {googleAdsConnectMessage.ok ? <Check style={{ width: 15, height: 15 }} /> : <AlertCircle style={{ width: 15, height: 15 }} />}
+                    <span>{googleAdsConnectMessage.text}</span>
+                    <button onClick={() => setGoogleAdsConnectMessage(null)} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: 0, display: "flex" }}>
+                        <X style={{ width: 14, height: 14 }} />
+                    </button>
+                </div>
+            )}
             {/* SIDEBAR */}
             {sidebarOpen && <div className="g-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
             <aside className={`g-sidebar ${sidebarOpen ? "is-open" : ""}`} style={{

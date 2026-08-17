@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Globe, Check, X, Trash2, PlugZap, Loader2, CircleCheck, CircleAlert, Plus } from "lucide-react";
+import { Globe, Check, X, Trash2, PlugZap, Loader2, CircleCheck, CircleAlert, Plus, Link2, Unlink } from "lucide-react";
 
 export interface GoogleAdsConfig {
     sheetCsvUrls: string[];
@@ -82,6 +82,87 @@ function UrlListEditor({ label, hint, urls, setUrls }: { label: string; hint: st
     );
 }
 
+type ApiStatus =
+    | { state: "loading" }
+    | { state: "disconnected" }
+    | { state: "connected"; accessibleCustomerIds: string[]; resolvedAccounts: string[] }
+    | { state: "error"; error: string };
+
+function ApiConnectionSection({ open }: { open: boolean }) {
+    const [status, setStatus] = useState<ApiStatus>({ state: "loading" });
+    const [disconnecting, setDisconnecting] = useState(false);
+
+    const refresh = async () => {
+        setStatus({ state: "loading" });
+        try {
+            const res = await fetch("/api/meugestor/gads-api/status");
+            const json = await res.json();
+            if (!json.success) { setStatus({ state: "error", error: json.error || "Falha ao checar conexão" }); return; }
+            if (!json.data.connected) { setStatus({ state: "disconnected" }); return; }
+            setStatus({ state: "connected", accessibleCustomerIds: json.data.accessibleCustomerIds, resolvedAccounts: json.data.resolvedAccounts });
+        } catch (e: any) {
+            setStatus({ state: "error", error: e.message || "Falha de rede" });
+        }
+    };
+
+    useEffect(() => { if (open) refresh(); }, [open]);
+
+    const handleDisconnect = async () => {
+        if (!confirm("Desconectar a API oficial do Google Ads? Você pode reconectar quando quiser.")) return;
+        setDisconnecting(true);
+        try {
+            await fetch("/api/meugestor/gads-api/status", { method: "DELETE" });
+            await refresh();
+        } finally {
+            setDisconnecting(false);
+        }
+    };
+
+    return (
+        <div style={{ background: "rgba(76,110,245,0.06)", border: "1px solid rgba(76,110,245,0.2)", borderRadius: "0.5rem", padding: "0.85rem", marginBottom: "1.25rem" }}>
+            <p style={{ margin: "0 0 0.5rem", fontWeight: 700, color: "white", fontSize: "0.8rem" }}>Conexão direta via API oficial (beta)</p>
+
+            {status.state === "loading" && (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "rgba(255,255,255,0.5)", fontSize: "0.75rem" }}>
+                    <Loader2 className="g-pulse" style={{ width: 13, height: 13 }} /> Checando conexão...
+                </div>
+            )}
+
+            {status.state === "disconnected" && (
+                <>
+                    <p style={{ margin: "0 0 0.6rem", color: "rgba(255,255,255,0.6)", fontSize: "0.72rem" }}>
+                        Login direto com o Google (igual o Reportei) — sem colar planilha. Requer o app do ensaios.ai aprovado pelo Google e o developer token com acesso Básico; até lá, a conexão funciona mas só enxerga contas de teste.
+                    </p>
+                    <a href="/api/auth/google-ads/connect" className="g-btn-primary"
+                        style={{ padding: "0.5rem 0.85rem", fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: "0.4rem", textDecoration: "none" }}>
+                        <Link2 style={{ width: 13, height: 13 }} /> Conectar Google Ads
+                    </a>
+                </>
+            )}
+
+            {status.state === "connected" && (
+                <>
+                    <div style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start", color: "#34d399", fontSize: "0.75rem", marginBottom: "0.6rem" }}>
+                        <CircleCheck style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1 }} />
+                        <span>Conectado — {status.accessibleCustomerIds.length} contas acessíveis, {status.resolvedAccounts.length} resolvidas na hierarquia.</span>
+                    </div>
+                    <button onClick={handleDisconnect} disabled={disconnecting} className="g-btn-secondary"
+                        style={{ color: "#f87171", borderColor: "rgba(248,113,113,0.3)", padding: "0.4rem 0.7rem", fontSize: "0.72rem", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                        <Unlink style={{ width: 12, height: 12 }} /> {disconnecting ? "Desconectando..." : "Desconectar"}
+                    </button>
+                </>
+            )}
+
+            {status.state === "error" && (
+                <div style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start", color: "#f87171", fontSize: "0.75rem" }}>
+                    <CircleAlert style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1 }} />
+                    <span>{status.error}</span>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSave, onClear }: Props) {
     const [urls, setUrls] = useState<string[]>(currentConfig.sheetCsvUrls.length ? currentConfig.sheetCsvUrls : [""]);
     const [campaignUrls, setCampaignUrls] = useState<string[]>(currentConfig.campaignSheetCsvUrls.length ? currentConfig.campaignSheetCsvUrls : [""]);
@@ -152,12 +233,20 @@ export default function GoogleAdsTokenModal({ open, onClose, currentConfig, onSa
                         </div>
                         <div>
                             <h3 style={{ color: "white", fontSize: "0.95rem", fontWeight: 700, margin: 0 }}>Configuração Google Ads</h3>
-                            <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.68rem", margin: 0 }}>Via planilha exportada — sem OAuth, sem Google Cloud</p>
+                            <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.68rem", margin: 0 }}>API oficial (beta) ou planilha exportada</p>
                         </div>
                     </div>
                     <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer" }}>
                         <X style={{ width: 18, height: 18 }} />
                     </button>
+                </div>
+
+                <ApiConnectionSection open={open} />
+
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "1rem", marginBottom: "0.75rem" }}>
+                    <p style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.5)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        Alternativa: planilha exportada (sem esperar aprovação do Google)
+                    </p>
                 </div>
 
                 <UrlListEditor

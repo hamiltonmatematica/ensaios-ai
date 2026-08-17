@@ -10,6 +10,8 @@ const publicRoutes = [
     '/auth/callback',
     '/support',
     '/portfolio', // Página pública de portfólio
+    '/privacidade', // Política de Privacidade — precisa ser pública p/ revisão OAuth do Google
+    '/termos', // Termos de Serviço — idem
     '/api/auth',
     '/_next',
     '/favicon.ico',

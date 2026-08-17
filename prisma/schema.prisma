@@ -50,6 +50,18 @@ model UserApiConfig {
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// Conexão OAuth com a API oficial do Google Ads (Meu Gestor). Sem relação com
+// User — meugestor não tem sessão/login, é uma conexão única do operador.
+// Sempre 1 linha (id fixo "google-ads-connection"), atualizada via upsert.
+model GoogleAdsConnection {
+  id               String   @id @default(cuid())
+  refreshToken     String
+  loginCustomerIds Json     // map { [customerId]: loginCustomerId } resolvido a partir da hierarquia de MCC
+  connectedEmail   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 model FaceSwapJob {
   id           String   @id @default(cuid())
   userId       String
